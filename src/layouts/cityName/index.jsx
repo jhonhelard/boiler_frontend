@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Card from "@mui/material/Card";
 import Grid from "@mui/material/Grid";
 import MDBox from "components/MDBox";
@@ -14,10 +14,30 @@ import { notification } from "antd";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import { useMaterialUIController } from "context";
 
+// Custom hook for responsive design
+const useResponsive = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth <= 480);
+      setIsTablet(window.innerWidth <= 768 && window.innerWidth > 480);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  return { isMobile, isTablet };
+};
+
 
 function CityTables() {
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
+  const { isMobile, isTablet } = useResponsive();
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -88,19 +108,19 @@ function CityTables() {
     fetchCities();
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { 
       Header: "City Name", 
       accessor: "name",
       Cell: ({ value }) => (
         <div style={{
-          fontSize: '14px',
+          fontSize: isMobile ? '12px' : '14px',
           lineHeight: '1.3',
           wordBreak: 'break-word',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          padding: '6px 8px',
+          padding: isMobile ? '4px 6px' : '6px 8px',
           color: darkMode ? '#ffffff' : '#000000',
           fontWeight: '500',
         }}>
@@ -110,31 +130,39 @@ function CityTables() {
     },
     { Header: "Edit", accessor: "edit" },
     { Header: "Delete", accessor: "delete" },
-  ];
+  ], [isMobile, darkMode]);
 
-  const rows = cities.map((city) => ({
-    name: city.name,
-    edit: (
-      <MDButton
-        variant="gradient"
-        color="info"
-        size="small"
-        onClick={() => openEditModal(city)}
-      >
-        Edit
-      </MDButton>
-    ),
-    delete: (
-      <MDButton
-        variant="gradient"
-        color="error"
-        size="small"
-        onClick={() => handleDelete(city._id)}
-      >
-        Delete
-      </MDButton>
-    ),
-  }));
+  const tableData = useMemo(() => {
+    if (!cities || cities.length === 0) {
+      return { columns, rows: [] };
+    }
+
+    const rows = cities.map((city) => ({
+      name: city.name || 'N/A',
+      edit: (
+        <MDButton
+          variant="gradient"
+          color="info"
+          size="small"
+          onClick={() => openEditModal(city)}
+        >
+          Edit
+        </MDButton>
+      ),
+      delete: (
+        <MDButton
+          variant="gradient"
+          color="error"
+          size="small"
+          onClick={() => handleDelete(city._id)}
+        >
+          Delete
+        </MDButton>
+      ),
+    }));
+
+    return { columns, rows };
+  }, [cities, columns]);
 
   return (
     <DashboardLayout>
@@ -181,25 +209,28 @@ function CityTables() {
               </MDBox>
               <MDBox pt={3}>
                 <DataTable
-                  table={{ columns, rows }}
-                  entriesPerPage={{ defaultValue: 5, entries: [5, 10] }}
+                  table={tableData}
+                  entriesPerPage={{ 
+                    defaultValue: isMobile ? 5 : isTablet ? 8 : 10, 
+                    entries: isMobile ? [5, 10] : isTablet ? [8, 15] : [10, 20] 
+                  }}
                   canSearch={true}
                   showTotalEntries={true}
                   isLoading={loading}
                   sx={{
-                    fontSize: '14px',
+                    fontSize: isMobile ? '12px' : '14px',
                     '& .MuiTableCell-root': {
-                      fontSize: '14px',
+                      fontSize: isMobile ? '12px' : '14px',
                       color: darkMode ? '#ffffff' : '#000000',
                       fontWeight: '500',
                     },
                     '& .MuiTableHead-root .MuiTableCell-root': {
-                      fontSize: '14px',
+                      fontSize: isMobile ? '12px' : '14px',
                       color: darkMode ? '#ffffff' : '#000000',
                       fontWeight: 600,
                     },
                     '& .MuiTableBody-root .MuiTableCell-root': {
-                      fontSize: '14px',
+                      fontSize: isMobile ? '12px' : '14px',
                       color: darkMode ? '#ffffff' : '#000000',
                       fontWeight: '500',
                     },

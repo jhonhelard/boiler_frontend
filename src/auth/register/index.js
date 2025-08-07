@@ -319,7 +319,7 @@ function Register() {
                     <em>Select a region</em>
                   </MenuItem>
                   {cities.map((city) => (
-                    <MenuItem key={city._id} value={city.name}>
+                    <MenuItem key={city._id} value={city._id}>
                       {city.name}
                     </MenuItem>
                   ))}

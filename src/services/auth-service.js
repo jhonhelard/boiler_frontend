@@ -33,6 +33,11 @@ class AuthService {
     const endpoint = `/api/v1/auth/delete-user/${userId}`;
     return await HttpService.delete(endpoint);
   };
+
+  updateUserRegions = async (userId, regions) => {
+    const endpoint = `/api/v1/auth/update-user-regions/${userId}`;
+    return await HttpService.patch(endpoint, { regions });
+  };
 }
 
 export default new AuthService();

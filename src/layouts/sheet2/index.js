@@ -9,6 +9,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 import { useSelector, useDispatch } from "react-redux";
 import { setSheet1 } from "../../redux/sheet1";
+import { setRegions } from "../../redux/regions";
 import axios from "axios";
 import DataTable from "examples/Tables/DataTable";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
@@ -71,50 +72,225 @@ function Sheet2() {
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
   const sheetData1 = useSelector((state) => state.sheet1.data);
+  const regions = useSelector((state) => state.regions.data);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCity, setSelectedCity] = useState('');
+  const [userHasSelectedCity, setUserHasSelectedCity] = useState(false);
+  
   const [certificateTablePage, setCertificateTablePage] = useState(0);
+  const [certificateTablePage2, setCertificateTablePage2] = useState(0);
+  
   const { isAdmin, userInfo } = useContext(AuthContext);
   
-  const sheetData2 = sheetData1.slice(2, 10);
+  // Reset initialization state when component mounts
+  useEffect(() => {
+    console.log("Sheet2: Component mounted - resetting initialization state");
+    setIsInitialized(false);
+    setUserHasSelectedCity(false);
+  }, []);
+  
+  const sheetData2 = sheetData1 && sheetData1.length > 2 ? sheetData1.slice(2, 10) : [];
+
+  // Fetch regions data if not already loaded
+  const fetchRegions = async () => {
+    try {
+      const response = await axios.get("/api/v1/city");
+      const citiesData = response.data || response;
+      dispatch(setRegions(citiesData));
+    } catch (error) {
+      console.error('Failed to fetch cities:', error);
+    }
+  };
+
+  // Get user's assigned regions based on their permissions
+  const getUserAssignedRegions = useMemo(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return [];
+    
+    const userInfoFromToken = getUserInfo(token);
+    if (!userInfoFromToken || !userInfoFromToken.region) return [];
+    
+    // Convert region to array if it's a string (for backward compatibility)
+    let userRegions = userInfoFromToken.region;
+    if (typeof userRegions === 'string') {
+      userRegions = [userRegions];
+    }
+    
+    if (!Array.isArray(userRegions)) return [];
+    
+    // Map region IDs to region names using Redux regions data
+    if (regions && regions.length > 0) {
+      return userRegions
+        .map(regionId => {
+          const region = regions.find(r => r._id === regionId);
+          return region ? region.name : null;
+        })
+        .filter(regionName => regionName !== null);
+    }
+    
+    return [];
+  }, [regions]);
 
   // Get available regions for select dropdown
   const availableRegions = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0) return [];
-    return sheetData2.slice(1).map(row => row[1]).filter(region => region);
-  }, [sheetData2]);
+    if (isAdmin) {
+      // Admin can see all regions from sheet data
+      if (!sheetData2 || sheetData2.length === 0) return [];
+      return sheetData2.slice(1).map(row => row[1]).filter(region => region);
+    } else {
+      // Regular users can only see their assigned regions
+      return getUserAssignedRegions;
+    }
+  }, [sheetData2, isAdmin, getUserAssignedRegions]);
 
-  // Get user's region from JWT token
+  // Get user's region from JWT token and set initial selection
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Initialize default region selection
   useEffect(() => {
+    // Skip if already initialized or user has manually selected a city
+    if (isInitialized || userHasSelectedCity) return;
+    
+    // Skip if data is not yet loaded
+    if (!sheetData2 || sheetData2.length === 0) {
+      console.log("Sheet2: Skipping initialization - sheetData2 not loaded yet");
+      return;
+    }
+    if (!regions || regions.length === 0) {
+      console.log("Sheet2: Skipping initialization - regions not loaded yet");
+      return;
+    }
+    
     const token = localStorage.getItem("token");
-    if (token) {
-      const userInfoFromToken = getUserInfo(token);
-      if (userInfoFromToken) {
-        // Set the selected city based on user permissions
-        if (isAdmin) {
-          // Admin can select any region, default to first available
-          if (!selectedCity && availableRegions.length > 0) {
-            setSelectedCity(availableRegions[0]);
-          }
-        } else {
-          // Regular user is restricted to their assigned region
-          if (userInfoFromToken.region) {
-            setSelectedCity(userInfoFromToken.region); // Force their region
-          }
-        }
+    if (!token) {
+      setIsInitialized(true);
+      return;
+    }
+    
+    const userInfoFromToken = getUserInfo(token);
+    if (!userInfoFromToken) {
+      console.log("Failed to decode user information from token");
+      setIsInitialized(true);
+      return;
+    }
+    
+    if (isAdmin) {
+      // Admin can select any region, default to first available
+      if (availableRegions.length > 0) {
+        console.log("Sheet2: Setting admin default region to:", availableRegions[0]);
+        setSelectedCity(availableRegions[0]);
+        setIsInitialized(true);
       } else {
-        console.log("Failed to decode user information from token");
+        console.log("Sheet2: No available regions for admin");
+        setIsInitialized(true);
       }
     } else {
-      console.log("No token found in localStorage");
+      // Regular user is restricted to their assigned regions
+      if (userInfoFromToken.region && availableRegions.length > 0) {
+        // Convert region to array if it's a string (for backward compatibility)
+        let userRegions = userInfoFromToken.region;
+        if (typeof userRegions === 'string') {
+          userRegions = [userRegions];
+        }
+        
+        if (Array.isArray(userRegions) && userRegions.length > 0) {
+          // Find the first region name that matches user's assigned regions
+          const firstAssignedRegion = availableRegions.find(regionName => {
+            const region = regions.find(r => r.name === regionName);
+            return region && userRegions.includes(region._id);
+          });
+          
+          if (firstAssignedRegion) {
+            console.log("Sheet2: Setting user default region to:", firstAssignedRegion);
+            setSelectedCity(firstAssignedRegion);
+          } else if (availableRegions.length > 0) {
+            // Fallback to first available region
+            console.log("Sheet2: Setting user fallback region to:", availableRegions[0]);
+            setSelectedCity(availableRegions[0]);
+          } else {
+            console.log("Sheet2: No available regions for user");
+          }
+        }
+        setIsInitialized(true);
+      } else {
+        // No assigned regions, set to first available if any
+        if (availableRegions.length > 0) {
+          console.log("Sheet2: Setting user default region (no assigned regions) to:", availableRegions[0]);
+          setSelectedCity(availableRegions[0]);
+        } else {
+          console.log("Sheet2: No available regions for user");
+        }
+        setIsInitialized(true);
+      }
     }
-  }, [userInfo, isAdmin, availableRegions, selectedCity]);
+  }, [sheetData2, regions, availableRegions, isAdmin, userHasSelectedCity, isInitialized]);
 
-  // Reset certificate table page when selected city changes
+  // Reset certificate table pages when selected city changes
   useEffect(() => {
     setCertificateTablePage(0);
+    setCertificateTablePage2(0);
   }, [selectedCity]);
+
+  // Handle case where selected city is no longer available
+  useEffect(() => {
+    if (selectedCity && availableRegions.length > 0 && !availableRegions.includes(selectedCity)) {
+      // Selected city is no longer available, reset to first available
+      setSelectedCity(availableRegions[0]);
+      setUserHasSelectedCity(false);
+    }
+  }, [selectedCity, availableRegions]);
+
+  // Fallback effect to set default region when data loads after initialization
+  useEffect(() => {
+    // Only run if we have data but no city is selected and user hasn't manually selected one
+    if (sheetData2 && sheetData2.length > 0 && 
+        regions && regions.length > 0 && 
+        !selectedCity && 
+        !userHasSelectedCity && 
+        availableRegions.length > 0) {
+      
+      console.log("Sheet2: Fallback effect triggered - setting default region");
+      
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      
+      const userInfoFromToken = getUserInfo(token);
+      if (!userInfoFromToken) return;
+      
+      if (isAdmin) {
+        // Admin can select any region, default to first available
+        setSelectedCity(availableRegions[0]);
+      } else {
+        // Regular user is restricted to their assigned regions
+        if (userInfoFromToken.region && availableRegions.length > 0) {
+          // Convert region to array if it's a string (for backward compatibility)
+          let userRegions = userInfoFromToken.region;
+          if (typeof userRegions === 'string') {
+            userRegions = [userRegions];
+          }
+          
+          if (Array.isArray(userRegions) && userRegions.length > 0) {
+            // Find the first region name that matches user's assigned regions
+            const firstAssignedRegion = availableRegions.find(regionName => {
+              const region = regions.find(r => r.name === regionName);
+              return region && userRegions.includes(region._id);
+            });
+            
+            if (firstAssignedRegion) {
+              setSelectedCity(firstAssignedRegion);
+            } else if (availableRegions.length > 0) {
+              // Fallback to first available region
+              setSelectedCity(availableRegions[0]);
+            }
+          }
+        } else {
+          // No assigned regions, set to first available if any
+          setSelectedCity(availableRegions[0]);
+        }
+      }
+    }
+  }, [sheetData2, regions, availableRegions, selectedCity, userHasSelectedCity, isAdmin]);
 
   const fetchSheet = async () => {
     setLoading(true);
@@ -162,6 +338,13 @@ function Sheet2() {
   useEffect(() => {
     fetchSheet();
   }, [dispatch]);
+
+  // Fetch regions data if not already loaded
+  useEffect(() => {
+    if (!regions || regions.length === 0) {
+      fetchRegions();
+    }
+  }, [regions]);
 
   // Generate columns and rows for the table with responsive design
   const allKeys = sheetData1 && sheetData1.length > 2 ? Object.keys(sheetData1[2]) : [];
@@ -276,10 +459,8 @@ function Sheet2() {
       // Get available regions (skip header row)
       const availableRegions = sheetData2.slice(1).map(row => row[1]).filter(region => region);
 
-      // Set default selected city if not set
-      if (!selectedCity && availableRegions.length > 0) {
-        setSelectedCity(availableRegions[0]);
-      }
+      // Don't set default selected city here as it can cause infinite loops
+      // The default city should only be set in the initialization useEffect
 
       // Find the selected region's data
       const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
@@ -320,11 +501,123 @@ function Sheet2() {
   }, [sheetData2, selectedCity]);
 
   // Create regional chart data for selected city (Boiler status as per various region and total)
-  const regionalData = createBarChartData(2, 5);
+  const regionalData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+
+    if (!selectedRegionData) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 2; i <= 5; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 2; i <= 5; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: selectedCity,
+          data: chartData,
+          color: "info"
+        }
+      ]
+    };
+  }, [sheetData2, selectedCity]);
 
   // Create certificate bar chart data (Boiler as per type of certificate according to the region)
-  const certificateBarChartData = createBarChartData(81, 103);
-  const certificatesBarChartData = createBarChartData(77, 81);
+  const certificateBarChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+
+    if (!selectedRegionData) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 81; i <= 103; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 81; i <= 103; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: selectedCity,
+          data: chartData,
+          color: "warning"
+        }
+      ]
+    };
+  }, [sheetData2, selectedCity]);
+
+  const certificatesBarChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+
+    if (!selectedRegionData) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 77; i <= 81; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 77; i <= 81; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: selectedCity,
+          data: chartData,
+          color: "warning"
+        }
+      ]
+    };
+  }, [sheetData2, selectedCity]);
 
   // Create reusable function for pie chart data generation
   const createPieChartData = useMemo(() => {
@@ -381,12 +674,231 @@ function Sheet2() {
   }, [sheetData2, selectedCity]);
 
   // Create pie chart data for selected city (Boiler as per type by region)
-  const pieChartData = createPieChartData(6, 20);
+  const pieChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 6; i <= 20; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+    
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 6; i <= 20; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: chartLabels,
+      datasets: {
+        label: selectedCity,
+        data: chartData,
+        backgroundColors: backgroundColors
+      }
+    };
+  }, [sheetData2, selectedCity]);
+
   // Create pie chart data for fuel data (Boiler as per fuel by region)
-  const fuelPieChartData = createPieChartData(58, 76);
-  const industryPieChartData = createPieChartData(29, 50);
-  const surfacePieChartData = createPieChartData(51, 57);
-  const CapacityPieChartData = createPieChartData(21, 28);
+  const fuelPieChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 58; i <= 76; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+    
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 58; i <= 76; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: chartLabels,
+      datasets: {
+        label: selectedCity,
+        data: chartData,
+        backgroundColors: backgroundColors
+      }
+    };
+  }, [sheetData2, selectedCity]);
+
+  const industryPieChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 29; i <= 50; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+    
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 29; i <= 50; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: chartLabels,
+      datasets: {
+        label: selectedCity,
+        data: chartData,
+        backgroundColors: backgroundColors
+      }
+    };
+  }, [sheetData2, selectedCity]);
+
+  const surfacePieChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 51; i <= 57; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+    
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 51; i <= 57; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: chartLabels,
+      datasets: {
+        label: selectedCity,
+        data: chartData,
+        backgroundColors: backgroundColors
+      }
+    };
+  }, [sheetData2, selectedCity]);
+
+  const CapacityPieChartData = useMemo(() => {
+    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Find the selected region's data
+    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract column headers (labels) from header row
+    const chartLabels = [];
+    for (let i = 21; i <= 28; i++) {
+      if (sheetData2[0][i]) {
+        chartLabels.push(sheetData2[0][i]);
+      }
+    }
+    
+    // Extract data for selected region
+    const chartData = [];
+    for (let i = 21; i <= 28; i++) {
+      const value = parseInt(selectedRegionData[i]) || 0;
+      chartData.push(value);
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: chartLabels,
+      datasets: {
+        label: selectedCity,
+        data: chartData,
+        backgroundColors: backgroundColors
+      }
+    };
+  }, [sheetData2, selectedCity]);
 
   // Calculate the number of regions from the table data
   const regionCount = useMemo(() => {
@@ -692,28 +1204,45 @@ function Sheet2() {
                 </MDTypography>
               </MDBox>
               <MDBox pt={isMobile ? 2 : 3}>
-                {isAdmin ? (
-                  <MDBox mx={isMobile ? 1 : 2} mb={isMobile ? 2 : 3}>
+                <MDBox mx={isMobile ? 1 : 2} mb={isMobile ? 2 : 3}>
+                  {isAdmin ? (
                     <MDSelect
                       value={selectedCity}
-                      onChange={(e) => setSelectedCity(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedCity(e.target.value);
+                        setUserHasSelectedCity(true);
+                      }}
                       label="Select Region"
                       options={availableRegions}
                       style={{
                         fontSize: isMobile ? '12px' : '14px',
                       }}
                     />
-                  </MDBox>
-                ) : (
-                  <MDBox mx={isMobile ? 1 : 2} mb={isMobile ? 2 : 3}>
-                    <MDTypography variant="h6" color="text" fontWeight="medium">
-                      Your Region: {selectedCity}
-                    </MDTypography>
-                    <MDTypography variant="caption" color="text" fontWeight="light">
-                      You can only view data for your assigned region
-                    </MDTypography>
-                  </MDBox>
-                )}
+                  ) : (
+                    <MDBox>
+                      <MDTypography variant="h6" color="text" fontWeight="medium" mb={1}>
+                        Your Assigned Regions
+                      </MDTypography>
+                      <MDSelect
+                        value={selectedCity}
+                        onChange={(e) => {
+                          setSelectedCity(e.target.value);
+                          setUserHasSelectedCity(true);
+                        }}
+                        label="Select Your Region"
+                        options={availableRegions}
+                        style={{
+                          fontSize: isMobile ? '12px' : '14px',
+                        }}
+                      />
+                      {availableRegions.length > 0 && (
+                        <MDTypography variant="caption" color="text" fontWeight="light" mt={1}>
+                          You can view data for {availableRegions.length} assigned region{availableRegions.length > 1 ? 's' : ''}
+                        </MDTypography>
+                      )}
+                    </MDBox>
+                  )}
+                </MDBox>
                 <MDBox
                   mx={isMobile ? 1 : 2}
                   mt={isMobile ? -2 : -3}
@@ -1221,7 +1750,7 @@ function Sheet2() {
                                 WebkitOverflowScrolling: 'touch',
                               }}>
                                 <DataTable
-                                  key={`certificate-table-${selectedCity}-${certificateTablePage}`}
+                                  key={`certificate-table-1-${selectedCity}-${certificateTablePage}`}
                                   table={certificatesBarChartTableData}
                                   entriesPerPage={{ 
                                     defaultValue: 5, 
@@ -1301,19 +1830,16 @@ function Sheet2() {
                                 WebkitOverflowScrolling: 'touch',
                               }}>
                                 <DataTable
-                                  key={`certificate-table-${selectedCity}-${certificateTablePage}`}
+                                  key={`certificate-table-2-${selectedCity}-${certificateTablePage2}`}
                                   table={certificateBarChartTableData}
                                   entriesPerPage={{ 
-                                    defaultValue: 5, 
-                                    entries: [5, 10, 15, 20] 
+                                    defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
+                                    entries: isMobile ? [5] : isTablet ? [5] : [5] 
                                   }}
                                   canSearch={false}
                                   showTotalEntries={true}
                                   isLoading={loading}
                                   isSorted={false}
-                                  onPageChange={(newPage) => {
-                                    setCertificateTablePage(newPage);
-                                  }}
                                   sx={{
                                     minWidth: isMobile ? '100%' : 'auto',
                                     minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
@@ -1345,6 +1871,10 @@ function Sheet2() {
                             </MDBox>
                           </Card>
                         </MDBox>
+                      </Grid>
+
+                      <Grid item xs={12} md={12} lg={12}>
+                              hiii
                       </Grid>
 
                     </Grid>
