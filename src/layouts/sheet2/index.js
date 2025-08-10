@@ -12,8 +12,10 @@ import { setSheet1 } from "../../redux/sheet1";
 import { setRegions } from "../../redux/regions";
 import axios from "axios";
 import DataTable from "examples/Tables/DataTable";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import ReportsBarChart from "examples/Charts/BarCharts/VerticalBarChart";
+import ReportsLineChart from "examples/Charts/LineCharts/ReportsLineChart";
+import DefaultLineChart from "examples/Charts/LineCharts/DefaultLineChart";
 import MDSelect from "components/MDSelect/MDSelect";
 import PieChart from "examples/Charts/PieChart";
 import { AuthContext } from "context";
@@ -64,7 +66,7 @@ const useResponsive = () => {
 };
 
 // Registering the necessary chart elements
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
 
 function Sheet2() {
   const dispatch = useDispatch();
@@ -83,9 +85,22 @@ function Sheet2() {
   
   const { isAdmin, userInfo } = useContext(AuthContext);
   
+  const [perType, setPerType] = useState([]);
+  const [totalstate, setTotalstate] = useState([]);
+  const [perFuelUsed, setPerFuelUsed] = useState([]);
+  const [variousIndustries, setVariousIndustries] = useState([]);
+  const [HeatingSurface, setHeatingSurface] = useState([]);
+  const [perCapacity, setPerCapacity] = useState([]);
+  const [certificate, setCertificate] = useState([]);
+  const [BoilerRegistered, setBoilerRegistered] = useState([]);
+  const [Accidents, setAccidents] = useState([]);
+  const [Economisers, setEconomisers] = useState([]);
+  const [perVarious, setPerVarious] = useState([]);
+  const [EconomiserStatus, setEconomiserStatus] = useState([]);
+  const [RunningEconomisers, setRunningEconomisers] = useState([]);
+  const [Accident, setAccident] = useState([]);
   // Reset initialization state when component mounts
   useEffect(() => {
-    console.log("Sheet2: Component mounted - resetting initialization state");
     setIsInitialized(false);
     setUserHasSelectedCity(false);
   }, []);
@@ -202,7 +217,6 @@ function Sheet2() {
           });
           
           if (firstAssignedRegion) {
-            console.log("Sheet2: Setting user default region to:", firstAssignedRegion);
             setSelectedCity(firstAssignedRegion);
           } else if (availableRegions.length > 0) {
             // Fallback to first available region
@@ -250,7 +264,6 @@ function Sheet2() {
         !userHasSelectedCity && 
         availableRegions.length > 0) {
       
-      console.log("Sheet2: Fallback effect triggered - setting default region");
       
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -297,8 +310,36 @@ function Sheet2() {
     try {
       const res = await axios.get("/api/sheet-data");
       dispatch(setSheet1(res.data[1]));
+      setPerType(res.data[3]);
+      setTotalstate(res.data[2]);
+      setPerFuelUsed(res.data[4]);
+      setVariousIndustries(res.data[5]);
+      setHeatingSurface(res.data[6]);
+      setPerCapacity(res.data[7]);
+      setCertificate(res.data[8]);
+      setBoilerRegistered(res.data[9]);
+      setAccidents(res.data[10]);
+      setEconomisers(res.data[11]);
+      setPerVarious(res.data[12]);
+      setEconomiserStatus(res.data[13]);
+      setRunningEconomisers(res.data[14]);
+      setAccident(res.data[15]);
     } catch (err) {
       dispatch(setSheet1([]));
+      setPerType([]);
+      setTotalstate([]);
+      setPerFuelUsed([]);
+      setVariousIndustries([]);
+      setHeatingSurface([]);
+      setPerCapacity([]);
+      setCertificate([]);
+      setBoilerRegistered([]);
+      setAccidents([]);
+      setEconomisers([]);
+      setPerVarious([]);
+      setEconomiserStatus([]);
+      setRunningEconomisers([]);
+      setAccident([]);
     }
     setLoading(false);
   };
@@ -309,6 +350,20 @@ function Sheet2() {
       const res = await axios.post("/api/refresh-sheet-data");
       if (res.data.success) {
         dispatch(setSheet1(res.data.data[1]));
+        setPerType(res.data.data[3]);
+        setTotalstate(res.data.data[2]);
+        setPerFuelUsed(res.data.data[4]);
+        setVariousIndustries(res.data.data[5]);
+        setHeatingSurface(res.data.data[6]);
+        setPerCapacity(res.data.data[7]);
+        setCertificate(res.data.data[8]);
+        setBoilerRegistered(res.data.data[9]);
+        setAccidents(res.data.data[10]);
+        setEconomisers(res.data.data[11]);
+        setPerVarious(res.data.data[12]);
+        setEconomiserStatus(res.data.data[13]);
+        setRunningEconomisers(res.data.data[14]);
+        setAccident(res.data.data[15]);
         notification.success({
           message: 'Data Refreshed Successfully!',
           description: 'Google Sheets data has been updated and synchronized.',
@@ -409,9 +464,6 @@ function Sheet2() {
       };
     }
 
-    // Skip the first row (header) and extract region names from the second column
-    const labels = sheetData2.slice(1).map(row => row[1] || '').filter(label => label !== '');
-
     // Define colors for different datasets
     const colors = ["info", "success", "error", "warning", "primary"];
 
@@ -426,25 +478,68 @@ function Sheet2() {
     // Create datasets for columns 3-6 (indices 2-5)
     const datasets = [];
 
-    for (let i = 2; i <= 5; i++) {
-      if (sheetData2[0] && sheetData2[0][i]) {
-        const dataset = {
-          label: datasetLabels[i - 2], // Use dynamic label from header
-          data: sheetData2.slice(1).map(row => {
-            const value = parseInt(row[i]) || 0;
-            return value;
-          }),
-          color: colors[i - 2] || "info"
-        };
-        datasets.push(dataset);
-      }
-    }
+    if (isAdmin) {
+      // Admin sees all regions
+      // Skip the first row (header) and extract region names from the second column
+      const labels = sheetData2.slice(1).map(row => row[1] || '').filter(label => label !== '');
 
-    return {
-      labels,
-      datasets
-    };
-  }, [sheetData2]);
+      for (let i = 2; i <= 5; i++) {
+        if (sheetData2[0] && sheetData2[0][i]) {
+          const dataset = {
+            label: datasetLabels[i - 2], // Use dynamic label from header
+            data: sheetData2.slice(1).map(row => {
+              const value = parseInt(row[i]) || 0;
+              return value;
+            }),
+            color: colors[i - 2] || "info"
+          };
+          datasets.push(dataset);
+        }
+      }
+
+      return {
+        labels,
+        datasets
+      };
+    } else {
+      // Regular users only see their selected region
+      if (!selectedCity) {
+        return {
+          labels: [],
+          datasets: []
+        };
+      }
+
+      // Find the selected region's data
+      const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+      
+      if (!selectedRegionData) {
+        return {
+          labels: [],
+          datasets: []
+        };
+      }
+
+      // Create a single dataset for the selected region
+      const labels = [selectedCity]; // Only show selected city
+      
+      for (let i = 2; i <= 5; i++) {
+        if (sheetData2[0] && sheetData2[0][i]) {
+          const dataset = {
+            label: datasetLabels[i - 2], // Use dynamic label from header
+            data: [parseInt(selectedRegionData[i]) || 0], // Only one data point for selected city
+            color: colors[i - 2] || "info"
+          };
+          datasets.push(dataset);
+        }
+      }
+
+      return {
+        labels,
+        datasets
+      };
+    }
+  }, [sheetData2, isAdmin, selectedCity]);
 
   // Create reusable function for bar chart data generation
   const createBarChartData = useMemo(() => {
@@ -675,30 +770,97 @@ function Sheet2() {
 
   // Create pie chart data for selected city (Boiler as per type by region)
   const pieChartData = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
+    if (!perType || perType.length === 0 || !selectedCity) {
       return { labels: [], datasets: {} };
     }
     
     // Find the selected region's data
-    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    const selectedRegionData = perType.slice(1).find(row => row[0] === selectedCity);
     
     if (!selectedRegionData) {
       return { labels: [], datasets: {} };
     }
     
-    // Extract column headers (labels) from header row
+    // Extract column headers (labels) from header row (skip first column which is region name)
     const chartLabels = [];
-    for (let i = 6; i <= 20; i++) {
-      if (sheetData2[0][i]) {
-        chartLabels.push(sheetData2[0][i]);
+    for (let i = 1; i < perType[0].length; i++) {
+      if (perType[0][i] && perType[0][i].trim() !== '') {
+        chartLabels.push(perType[0][i]);
       }
     }
     
-    // Extract data for selected region
+    // Extract data for selected region (skip first column which is region name)
     const chartData = [];
-    for (let i = 6; i <= 20; i++) {
+    for (let i = 1; i < selectedRegionData.length; i++) {
       const value = parseInt(selectedRegionData[i]) || 0;
       chartData.push(value);
+    }
+
+    // Filter out zero values and their corresponding labels
+    const filteredLabels = [];
+    const filteredData = [];
+    chartLabels.forEach((label, index) => {
+      if (chartData[index] > 0) {
+        filteredLabels.push(label);
+        filteredData.push(chartData[index]);
+      }
+    });
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark", "info", "success", "error", "warning",
+      "primary", "secondary", "light", "dark", "info", "success",
+      "error", "warning", "primary", "secondary", "light", "dark"
+    ];
+
+    return {
+      labels: filteredLabels,
+      datasets: {
+        label: selectedCity,
+        data: filteredData,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
+      }
+    };
+  }, [perType, selectedCity]);
+
+  // Reusable function to process data for pie chart display based on selected city
+  const processPieChartData = (dataArray, selectedCity) => {
+    if (!dataArray || !Array.isArray(dataArray) || dataArray.length < 2 || !selectedCity) {
+      return { labels: [], datasets: {} };
+    }
+
+    // First element contains headers
+    const headers = dataArray[0] || [];
+    
+    // Find the row for the selected city
+    const selectedCityRow = dataArray.slice(1).find(row => row && row[0] === selectedCity);
+    
+    if (!selectedCityRow) {
+      return { labels: [], datasets: {} };
+    }
+
+    // Extract labels (skip first column which is region names)
+    const labels = headers.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Extract data for selected city (skip first column which is region name)
+    const data = selectedCityRow.slice(1).map(value => parseInt(value) || 0);
+    
+    // Filter out labels and data where value is 0 or label contains "Total"
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      // Skip if value is 0 or label contains "Total" (case insensitive)
+      if (data[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: {} };
     }
 
     // Define colors for pie chart segments
@@ -710,41 +872,386 @@ function Sheet2() {
     ];
 
     return {
-      labels: chartLabels,
+      labels: filteredLabels,
       datasets: {
         label: selectedCity,
-        data: chartData,
-        backgroundColors: backgroundColors
+        data: filteredData,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
       }
     };
-  }, [sheetData2, selectedCity]);
+  };
 
-  // Create pie chart data for fuel data (Boiler as per fuel by region)
-  const fuelPieChartData = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
-      return { labels: [], datasets: {} };
+  // Process perType data for pie chart display
+  const perTypePieChartData = useMemo(() => {
+    return processPieChartData(perType, selectedCity);
+  }, [perType, selectedCity]);
+
+  // Process perFuelUsed data for pie chart display
+  const perFuelUsedPieChartData = useMemo(() => {
+    return processPieChartData(perFuelUsed, selectedCity);
+  }, [perFuelUsed, selectedCity]);
+
+  // Reusable function to process data for bar chart display based on selected city
+  const processBarChartData = (dataArray, selectedCity) => {
+    if (!dataArray || !Array.isArray(dataArray) || dataArray.length < 2 || !selectedCity) {
+      return { labels: [], datasets: [] };
     }
+
+    // First element contains headers
+    const headers = dataArray[0] || [];
+    
+    // Find the row for the selected city
+    const selectedCityRow = dataArray.slice(1).find(row => row && row[0] === selectedCity);
+    
+    if (!selectedCityRow) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Extract labels (skip first column which is region names)
+    const labels = headers.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Extract data for selected city (skip first column which is region name)
+    const data = selectedCityRow.slice(1).map(value => parseInt(value) || 0);
+    
+    // Filter out labels and data where value is 0 or label contains "Total"
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      // Skip if value is 0 or label contains "Total" (case insensitive)
+      if (data[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Define colors for bar chart
+    const colors = ["info", "success", "error", "warning", "primary", "secondary"];
+
+    return {
+      labels: filteredLabels,
+      datasets: [
+        {
+          label: selectedCity,
+          data: filteredData,
+          color: colors[0] || "info"
+        }
+      ]
+    };
+  };
+
+  // Process perCapacity data for bar chart display
+  const perCapacityBarChartData = useMemo(() => {
+    return processBarChartData(perCapacity, selectedCity);
+  }, [perCapacity, selectedCity]);
+
+  // Process certificates data for bar chart display
+  const certificateDataBarChart = useMemo(() => {
+    return processBarChartData(certificate, selectedCity);
+  }, [certificate, selectedCity]);
+
+  // Process BoilerRegistered data for bar chart display (Year-wise data for all regions)
+  const boilerRegisteredBarChartData = useMemo(() => {
+    if (!BoilerRegistered || !Array.isArray(BoilerRegistered) || BoilerRegistered.length < 2) {
+      return { labels: [], datasets: [] };
+    }
+
+    // BoilerRegistered has a different structure:
+    // Array[0]: ['Year', '2020-2021', '2021-2022', '2022-2023', '2023-2024', ...]
+    // Array[1]: ['Total Numbers', '226', '310', '345', '360', '35', ...]
+    
+    const yearRow = BoilerRegistered[0] || [];
+    const numbersRow = BoilerRegistered[1] || [];
+    
+    // Extract years (skip first column which is 'Year')
+    const labels = yearRow.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Extract numbers (skip first column which is 'Total Numbers')
+    const data = numbersRow.slice(1).map(value => parseInt(value) || 0);
+    
+    // Filter out labels and data where value is 0
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      if (data[index] > 0) {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: filteredLabels,
+      datasets: [
+        {
+          label: "Total Boilers Registered",
+          data: filteredData,
+          color: "success"
+        }
+      ]
+    };
+  }, [BoilerRegistered]);
+
+  // Process Economisers data for bar chart display (Year-wise data for all regions)
+  const economisersBarChartData = useMemo(() => {
+    if (!Economisers || !Array.isArray(Economisers) || Economisers.length < 2) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Economisers likely has a similar structure to BoilerRegistered:
+    // Array[0]: ['Year', '2020-2021', '2021-2022', '2022-2023', '2023-2024', ...]
+    // Array[1]: ['Total Numbers', 'X', 'Y', 'Z', 'W', ...]
+    
+    const yearRow = Economisers[0] || [];
+    const numbersRow = Economisers[1] || [];
+    
+    // Extract years (skip first column which is 'Year')
+    const labels = yearRow.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Extract numbers (skip first column which is 'Total Numbers')
+    const data = numbersRow.slice(1).map(value => parseInt(value) || 0);
+    
+    // Filter out labels and data where value is 0
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      if (data[index] > 0) {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: filteredLabels,
+      datasets: [
+        {
+          label: "Total Economisers Manufactured",
+          data: filteredData,
+          color: "warning"
+        }
+      ]
+    };
+  }, [Economisers]);
+
+  // Process Accidents data for line chart display (Multiple datasets over years)
+  const accidentsLineChartData = useMemo(() => {
+    if (!Accidents || !Array.isArray(Accidents) || Accidents.length < 2) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Accidents has a structure with multiple datasets:
+    // Element 0: ['Year', '2020-2021', '2021-2022', '2022-2023', '2023-2024', '2']
+    // Element 1: ['Total No of Accidents', '4', '2', '6', '2', '1']
+    // Element 2: ['Death', '0', '0', '5', '0', '0']
+    // Element 3: ['Injury', '0', '0', '3', '0', '0']
+    
+    const yearRow = Accidents[0] || [];
+    const labels = yearRow.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Define colors for different datasets
+    const colors = ["error", "warning", "info"];
+    const datasets = [];
+    
+    // Process each data row (skip the first row which contains years)
+    for (let i = 1; i < Accidents.length; i++) {
+      const dataRow = Accidents[i] || [];
+      if (dataRow.length < 2) continue;
+      
+      const datasetName = dataRow[0] || `Dataset ${i}`;
+      const data = dataRow.slice(1).map(value => parseInt(value) || 0);
+      
+      // Only add dataset if it has valid data
+      if (data.some(val => val > 0)) {
+        datasets.push({
+          label: datasetName,
+          data: data,
+          color: colors[i - 1] || "info"
+        });
+      }
+    }
+
+    return {
+      labels: labels,
+      datasets: datasets
+    };
+  }, [Accidents]);
+
+  // Process Accident data for city-specific line chart display
+  const cityAccidentLineChartData = useMemo(() => {
+    if (!Accident || !Array.isArray(Accident) || Accident.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    // Debug: Log available cities in Accident data
+
+    // Find the selected city's accident data with improved matching
+    const selectedCityData = Accident.find(item => {
+      if (!item || !item.title) return false;
+      
+      // Try exact match first
+      if (item.title === selectedCity) return true;
+      
+      // Try case-insensitive match
+      if (item.title.toLowerCase() === selectedCity.toLowerCase()) return true;
+      
+      // Try uppercase match
+      if (item.title.toUpperCase() === selectedCity.toUpperCase()) return true;
+      
+      // Try to match common variations
+      const normalizedTitle = item.title.replace(/[^A-Za-z]/g, '').toLowerCase();
+      const normalizedSelectedCity = selectedCity.replace(/[^A-Za-z]/g, '').toLowerCase();
+      if (normalizedTitle === normalizedSelectedCity) return true;
+      
+      return false;
+    });
+
+    if (!selectedCityData || !selectedCityData.data || !Array.isArray(selectedCityData.data)) {
+      console.log("No city data found or invalid data structure");
+      return { labels: [], datasets: [] };
+    }
+
+    const accidentData = selectedCityData.data;
+    
+    // The first element contains the years/headers
+    const yearRow = accidentData[0] || [];
+    const labels = yearRow.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Define colors for different accident types
+    const colors = ["error", "warning", "info", "success", "primary"];
+    const datasets = [];
+    
+    // Process each data row (skip the first row which contains years)
+    for (let i = 1; i < accidentData.length; i++) {
+      const dataRow = accidentData[i] || [];
+      if (dataRow.length < 2) continue;
+      
+      const datasetName = dataRow[0] || `Accident Type ${i}`;
+      const data = dataRow.slice(1).map(value => parseInt(value) || 0);
+      
+      // Always add dataset regardless of whether it has values > 0
+      // This ensures all three lines (Total Accidents, Deaths, Injuries) are shown
+      datasets.push({
+        label: datasetName,
+        data: data,
+        color: colors[i - 1] || "info"
+      });
+    }
+
+
+    return {
+      labels: labels,
+      datasets: datasets
+    };
+  }, [Accident, selectedCity]);
+
+  // Process EconomiserStatus data for bar chart display (Region-wise data)
+  const economiserStatusBarChartData = useMemo(() => {
+    if (!EconomiserStatus || !Array.isArray(EconomiserStatus) || EconomiserStatus.length < 2) {
+      return { labels: [], datasets: [] };
+    }
+
+    // EconomiserStatus has a structure with region-wise data:
+    // Element 0: ['Region', 'Running Economiser', 'Not offered since last 365 Da', ...]
+    // Element 1: ['Pune', '31', '11', '87', '129']
+    // Element 2: ['Mumbai', '30', '7', '15', '52']
+    // etc...
+    
+    const headerRow = EconomiserStatus[0] || [];
+    const labels = headerRow.slice(1).filter(label => label && label.trim() !== '');
     
     // Find the selected region's data
-    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
+    const selectedRegionData = EconomiserStatus.slice(1).find(row => row && row[0] === selectedCity);
+    
+    if (!selectedRegionData) {
+      return { labels: [], datasets: [] };
+    }
+    
+    // Extract data for selected region (skip first column which is region name)
+    const data = selectedRegionData.slice(1).map(value => parseInt(value) || 0);
+    
+    // Filter out labels and data where value is 0
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      if (data[index] > 0) {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: filteredLabels,
+      datasets: [
+        {
+          label: selectedCity,
+          data: filteredData,
+          color: "primary"
+        }
+      ]
+    };
+  }, [EconomiserStatus, selectedCity]);
+
+  // Process RunningEconomisers data for pie chart display (Industry-wise data by region)
+  const runningEconomisersPieChartData = useMemo(() => {
+    if (!RunningEconomisers || !Array.isArray(RunningEconomisers) || RunningEconomisers.length < 2) {
+      return { labels: [], datasets: {} };
+    }
+
+    // RunningEconomisers has a structure with industry-wise data by region:
+    // Element 0: ['Region', 'Power Generation', 'Sugar', 'Distillary', 'Chemical', 'Text', 'Paper', 'Rubber', 'Food', 'Oil', 'Other', 'Total']
+    // Element 1: ['Pune', '0', '15', '0', '2', '1', '0', '4', '0', '0', '0', '0', ...]
+    // Element 2: ['Mumbai', '0', '0', '0', '11', '4', '3', '2', '2', '6', '0', '0', ...]
+    // etc...
+    
+    const headerRow = RunningEconomisers[0] || [];
+    const labels = headerRow.slice(1).filter(label => label && label.trim() !== '' && label !== 'Total');
+    
+    // Find the selected region's data
+    const selectedRegionData = RunningEconomisers.slice(1).find(row => row && row[0] === selectedCity);
     
     if (!selectedRegionData) {
       return { labels: [], datasets: {} };
     }
     
-    // Extract column headers (labels) from header row
-    const chartLabels = [];
-    for (let i = 58; i <= 76; i++) {
-      if (sheetData2[0][i]) {
-        chartLabels.push(sheetData2[0][i]);
-      }
-    }
+    // Extract data for selected region (skip first column which is region name)
+    const data = selectedRegionData.slice(1).map(value => parseInt(value) || 0);
     
-    // Extract data for selected region
-    const chartData = [];
-    for (let i = 58; i <= 76; i++) {
-      const value = parseInt(selectedRegionData[i]) || 0;
-      chartData.push(value);
+    // Filter out labels and data where value is 0 or label is 'Total'
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      if (data[index] > 0 && label !== 'Total') {
+        filteredLabels.push(label);
+        filteredData.push(data[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: {} };
     }
 
     // Define colors for pie chart segments
@@ -756,149 +1263,82 @@ function Sheet2() {
     ];
 
     return {
-      labels: chartLabels,
+      labels: filteredLabels,
       datasets: {
         label: selectedCity,
-        data: chartData,
-        backgroundColors: backgroundColors
+        data: filteredData,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
       }
     };
-  }, [sheetData2, selectedCity]);
+  }, [RunningEconomisers, selectedCity]);
 
-  const industryPieChartData = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
-      return { labels: [], datasets: {} };
-    }
-    
-    // Find the selected region's data
-    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
-    
-    if (!selectedRegionData) {
-      return { labels: [], datasets: {} };
-    }
-    
-    // Extract column headers (labels) from header row
-    const chartLabels = [];
-    for (let i = 29; i <= 50; i++) {
-      if (sheetData2[0][i]) {
-        chartLabels.push(sheetData2[0][i]);
-      }
-    }
-    
-    // Extract data for selected region
-    const chartData = [];
-    for (let i = 29; i <= 50; i++) {
-      const value = parseInt(selectedRegionData[i]) || 0;
-      chartData.push(value);
+  // Process perVarious data for table display (District-wise data by region)
+  const perVariousTableData = useMemo(() => {
+    if (!perVarious || !Array.isArray(perVarious) || perVarious.length === 0 || !selectedCity) {
+      return { columns: [], rows: [] };
     }
 
-    // Define colors for pie chart segments
-    const backgroundColors = [
-      "info", "success", "error", "warning", "primary", "secondary",
-      "light", "dark", "info", "success", "error", "warning",
-      "primary", "secondary", "light", "dark", "info", "success",
-      "error", "warning", "primary", "secondary", "light", "dark"
-    ];
+    // Find the region object that matches the selected city (case-insensitive)
+    const selectedRegionObject = perVarious.find(regionObj => {
+      if (!regionObj || !regionObj.title || !regionObj.data) return false;
+      // Convert both to lowercase for case-insensitive comparison
+      return regionObj.title.toLowerCase() === selectedCity.toLowerCase();
+    });
 
-    return {
-      labels: chartLabels,
-      datasets: {
-        label: selectedCity,
-        data: chartData,
-        backgroundColors: backgroundColors
-      }
-    };
-  }, [sheetData2, selectedCity]);
-
-  const surfacePieChartData = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
-      return { labels: [], datasets: {} };
-    }
-    
-    // Find the selected region's data
-    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
-    
-    if (!selectedRegionData) {
-      return { labels: [], datasets: {} };
-    }
-    
-    // Extract column headers (labels) from header row
-    const chartLabels = [];
-    for (let i = 51; i <= 57; i++) {
-      if (sheetData2[0][i]) {
-        chartLabels.push(sheetData2[0][i]);
-      }
-    }
-    
-    // Extract data for selected region
-    const chartData = [];
-    for (let i = 51; i <= 57; i++) {
-      const value = parseInt(selectedRegionData[i]) || 0;
-      chartData.push(value);
+    if (!selectedRegionObject || !selectedRegionObject.data || !Array.isArray(selectedRegionObject.data)) {
+      return { columns: [], rows: [] };
     }
 
-    // Define colors for pie chart segments
-    const backgroundColors = [
-      "info", "success", "error", "warning", "primary", "secondary",
-      "light", "dark", "info", "success", "error", "warning",
-      "primary", "secondary", "light", "dark", "info", "success",
-      "error", "warning", "primary", "secondary", "light", "dark"
-    ];
-
-    return {
-      labels: chartLabels,
-      datasets: {
-        label: selectedCity,
-        data: chartData,
-        backgroundColors: backgroundColors
-      }
-    };
-  }, [sheetData2, selectedCity]);
-
-  const CapacityPieChartData = useMemo(() => {
-    if (!sheetData2 || sheetData2.length === 0 || !selectedCity) {
-      return { labels: [], datasets: {} };
-    }
+    const tableData = selectedRegionObject.data;
     
-    // Find the selected region's data
-    const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
-    
-    if (!selectedRegionData) {
-      return { labels: [], datasets: {} };
-    }
-    
-    // Extract column headers (labels) from header row
-    const chartLabels = [];
-    for (let i = 21; i <= 28; i++) {
-      if (sheetData2[0][i]) {
-        chartLabels.push(sheetData2[0][i]);
-      }
-    }
-    
-    // Extract data for selected region
-    const chartData = [];
-    for (let i = 21; i <= 28; i++) {
-      const value = parseInt(selectedRegionData[i]) || 0;
-      chartData.push(value);
+    // First element contains the table headers (districts)
+    const headers = tableData[0] || [];
+    if (headers.length === 0) {
+      return { columns: [], rows: [] };
     }
 
-    // Define colors for pie chart segments
-    const backgroundColors = [
-      "info", "success", "error", "warning", "primary", "secondary",
-      "light", "dark", "info", "success", "error", "warning",
-      "primary", "secondary", "light", "dark", "info", "success",
-      "error", "warning", "primary", "secondary", "light", "dark"
-    ];
+    // Create columns from headers
+    const columns = headers.map((header, index) => ({
+      Header: header,
+      accessor: `col${index}`,
+      minWidth: isMobile ? 80 : isTablet ? 120 : 150,
+      maxWidth: isMobile ? 150 : isTablet ? 200 : 250,
+      Cell: ({ value }) => (
+        <div style={{
+          fontSize: isMobile ? '12px' : '14px',
+          lineHeight: '1.3',
+          wordBreak: 'break-word',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          padding: isMobile ? '4px 6px' : '6px 8px',
+          color: darkMode ? '#ffffff' : '#000000',
+          fontWeight: '500',
+        }}>
+          {value || 'N/A'}
+        </div>
+      ),
+    }));
 
-    return {
-      labels: chartLabels,
-      datasets: {
-        label: selectedCity,
-        data: chartData,
-        backgroundColors: backgroundColors
-      }
-    };
-  }, [sheetData2, selectedCity]);
+    // Create rows from data (skip first element which is headers)
+    const rows = tableData.slice(1).map((dataRow, rowIndex) => {
+      const row = {};
+      headers.forEach((header, colIndex) => {
+        row[`col${colIndex}`] = dataRow[colIndex] || '';
+      });
+      return row;
+    });
+
+    return { columns, rows };
+  }, [perVarious, selectedCity, isMobile, isTablet, darkMode]);
+
+  const variousIndustriesPieChartData = useMemo(() => {
+    return processPieChartData(variousIndustries, selectedCity);
+  }, [variousIndustries, selectedCity]);
+
+  const HeatingSurfacePieChartData = useMemo(() => {
+    return processPieChartData(HeatingSurface, selectedCity);
+  }, [HeatingSurface, selectedCity]);
 
   // Calculate the number of regions from the table data
   const regionCount = useMemo(() => {
@@ -915,20 +1355,7 @@ function Sheet2() {
     return regions.length;
   }, [sheetData1, allKeys]);
 
-  // Calculate total values from the table data
-  const totalValues = useMemo(() => {
-    if (!sheetData1 || sheetData1.length === 0) return { running: 0, notOffered: 0, idle: 0 };    
-    // Find the "Total" row in sheetData2
-    const totalRow = sheetData1.find(row => row[1] === 'Total');
-    
-    if (!totalRow) return { running: 0, notOffered: 0, idle: 0 };
-    
-    return {
-      running: parseInt(totalRow[2]) || 0,      // Running Boilers (column 2)
-      notOffered: parseInt(totalRow[3]) || 0,   // Boiler Not Offered Since Last 365 Days (column 3)
-      idle: parseInt(totalRow[4]) || 0,         // Idle Boilers (column 4)
-    };
-  }, [sheetData2]);
+
 
   
   // Reusable function to create table data from chart data (works for both bar and pie charts)
@@ -1004,17 +1431,16 @@ function Sheet2() {
 
   // Create table data from regionalData for the chart
   const regionalTableData = createTableDataFromChart(regionalData, "Regional Data");
-  
   // Create table data for pie charts
-  const pieChartTableData = createTableDataFromChart(pieChartData, "Boiler Type Data");
-  const fuelPieChartTableData = createTableDataFromChart(fuelPieChartData, "Fuel Type Data");
-  const industryPieChartTableData = createTableDataFromChart(industryPieChartData, "Industry Type Data");
-  const surfacePieChartTableData = createTableDataFromChart(surfacePieChartData, "Heating Surface Data");
-  const capacityPieChartTableData = createTableDataFromChart(CapacityPieChartData, "Capacity Data");
+  const pieChartTableData = createTableDataFromChart(perTypePieChartData, "Boiler Type Data");
+  const perFuelUsedTableData = createTableDataFromChart(perFuelUsedPieChartData, "Fuel Type Data");
+  const variousIndustriesTableData = createTableDataFromChart(variousIndustriesPieChartData, "Various Industries Data");
+  const HeatingSurfaceTableData = createTableDataFromChart(HeatingSurfacePieChartData, "Heating Surface Data");
   
   // Create table data for certificate bar chart
   const certificateBarChartTableData = createTableDataFromChart(certificateBarChartData, "Certificate Type Data");
-  const certificatesBarChartTableData = createTableDataFromChart(certificatesBarChartData, "Certificate Type Data");
+
+  
   
   // Ensure certificate table data is properly structured
   if (certificateBarChartTableData && certificateBarChartTableData.rows) {
@@ -1022,7 +1448,80 @@ function Sheet2() {
       row && row.category && row.category.trim() !== '' && row.value !== undefined
     );
   }
-
+ 
+  
+  // Extract total values from totalstate array for ComplexStatisticsCard
+  const totalValues = useMemo(() => {
+    
+    if (totalstate && totalstate.length > 0) {
+      // totalstate is a 2D array from Google Sheets range B3:F11
+      // Each row has 5 columns: [State, Running, NotOffered, Idle, Other]
+      // We need to find the row that contains totals or the last row
+      
+      // Look for a row that might contain totals (usually has "Total" or similar in first column)
+      let totalRow = null;
+      
+      // First, try to find a row with "Total" in the first column
+      for (let i = 0; i < totalstate.length; i++) {
+        if (totalstate[i] && totalstate[i][0] && 
+            (totalstate[i][0].toString().toLowerCase().includes('total') || 
+             totalstate[i][0].toString().toLowerCase().includes('sum'))) {
+          totalRow = totalstate[i];
+          break;
+        }
+      }
+      
+      // If no total row found, use the last row
+      if (!totalRow && totalstate.length > 0) {
+        totalRow = totalstate[totalstate.length - 1];
+        console.log("Using last row as total row:", totalRow);
+      }
+      
+      if (totalRow && Array.isArray(totalRow) && totalRow.length >= 4) {
+        // Extract the three values from the total row
+        const running = parseInt(totalRow[1]) || 0;        // Running Boilers (index 1)
+        const notOffered = parseInt(totalRow[2]) || 0;     // Boiler not offered since last 1 year (index 2)
+        const idle = parseInt(totalRow[3]) || 0;           // Total Idle Boilers (index 3)
+        
+        
+        return { running, notOffered, idle };
+      }
+      
+      // If still no valid data, calculate totals from all rows
+      if (totalstate.length > 0) {
+        let totalRunning = 0;
+        let totalNotOffered = 0;
+        let totalIdle = 0;
+        
+        for (let i = 0; i < totalstate.length; i++) {
+          const row = totalstate[i];
+          if (row && Array.isArray(row) && row.length >= 4) {
+            totalRunning += parseInt(row[1]) || 0;
+            totalNotOffered += parseInt(row[2]) || 0;
+            totalIdle += parseInt(row[3]) || 0;
+          }
+        }
+        
+        console.log("Calculated totals from all rows:", { totalRunning, totalNotOffered, totalIdle });
+        
+        return {
+          running: totalRunning,
+          notOffered: totalNotOffered,
+          idle: totalIdle
+        };
+      }
+    }
+    
+    console.log("Using default values for ComplexStatisticsCard"); // Debug log
+    return {
+      running: 0,
+      notOffered: 0,
+      idle: 0
+    };
+  }, [totalstate]);
+  
+  // console.log(BoilerRegistered, "BoilerRegistered"); // Removed to prevent console spam
+  
   return (
     <DashboardLayout>
       <DashboardNavbar />
@@ -1030,7 +1529,7 @@ function Sheet2() {
       <Grid container spacing={3} pt={3}>
         {isAdmin && (
           <>
-                      <Grid item xs={12} md={6} lg={4}>
+            <Grid item xs={12} md={6} lg={4}>
               <MDBox mb={1.5}>
                 <ComplexStatisticsCard
                   icon="leaderboard"
@@ -1074,117 +1573,10 @@ function Sheet2() {
                 />
               </MDBox>
             </Grid>
-          </>
-          
+          </>  
         )}
       </Grid>
-      <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
-        <Grid container spacing={isMobile ? 2 : 6}>
-          {isAdmin && (
-            <Grid item xs={12}>
-              <Card>
-                <MDBox
-                  mx={isMobile ? 1 : 2}
-                  mt={isMobile ? -2 : -3}
-                  py={isMobile ? 2 : 3}
-                  px={isMobile ? 1 : 2}
-                  variant="gradient"
-                  bgColor="info"
-                  borderRadius="lg"
-                  coloredShadow="info"
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                    All Table
-                  </MDTypography>
-                  
-                  <MDButton
-                    variant="gradient"
-                    color="success"
-                    size={isMobile ? "small" : "medium"}
-                    onClick={refreshData}
-                    disabled={refreshing}
-                    style={{
-                      fontSize: isMobile ? '10px' : '12px',
-                      padding: isMobile ? '6px 12px' : '8px 16px',
-                      minWidth: isMobile ? '60px' : '80px',
-                    }}
-                  >
-                    {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
-                  </MDButton>
-                </MDBox>
-                <MDBox pt={isMobile ? 2 : 3}>
-                  <div style={{
-                    overflowX: 'auto',
-                    maxWidth: '100%',
-                    WebkitOverflowScrolling: 'touch',
-                  }}>
-                    <DataTable
-                      table={{ columns, rows }}
-                      entriesPerPage={{ 
-                        defaultValue: isMobile ? 5 : isTablet ? 8 : 10, 
-                        entries: isMobile ? [5, 10] : isTablet ? [8, 15] : [10, 20] 
-                      }}
-                      canSearch={false}
-                      showTotalEntries={true}
-                      isLoading={loading}
-                      isSorted={false}
-                      sx={{
-                        minWidth: isMobile ? '100%' : 'auto',
-                        minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                        fontSize: isMobile ? '12px' : '14px',
-                        '& .MuiTableCell-root': {
-                          padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                          borderSpacing: isMobile ? '2px' : '4px',
-                          fontSize: isMobile ? '12px' : '14px',
-                          color: darkMode ? '#ffffff' : '#000000',
-                          fontWeight: '500',
-                        },
-                        '& .MuiTableHead-root .MuiTableCell-root': {
-                          padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                          fontSize: isMobile ? '12px' : '14px',
-                          color: darkMode ? '#ffffff' : '#000000',
-                          fontWeight: 600,
-                        },
-                        '& .MuiTableBody-root .MuiTableCell-root': {
-                          fontSize: isMobile ? '12px' : '14px',
-                          color: darkMode ? '#ffffff' : '#000000',
-                          fontWeight: '500',
-                        },
-                        '& .MuiTableContainer-root': {
-                          minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
-                        },
-                      }}
-                    />
-                  </div>
-                  <MDBox
-                    mx={isMobile ? 1 : 2}
-                    mt={isMobile ? -2 : -3}
-                    py={isMobile ? 2 : 3}
-                    px={isMobile ? 1 : 2}
-                    variant="gradient"
-                    borderRadius="lg"
-                  >
-                    <MDBox mb={isMobile ? 2 : 3}>
-                      <ReportsBarChart
-                        color="info"
-                        title="Boiler Statistics by Region"
-                        description="Regional boiler performance data"
-                        date="data updated from Google Sheets"
-                        chart={data}
-                      />
-                    </MDBox>
-                  </MDBox>
-                </MDBox>
-              </Card>
-            </Grid>
-          )}
-        </Grid>
-      </MDBox>
+
       <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
         <Grid container spacing={isMobile ? 2 : 6}>
           <Grid item xs={12}>
@@ -1198,10 +1590,31 @@ function Sheet2() {
                 bgColor="info"
                 borderRadius="lg"
                 coloredShadow="info"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
                 <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
                   City Table
                 </MDTypography>
+
+                <MDButton
+                    variant="gradient"
+                    color="success"
+                    size={isMobile ? "small" : "medium"}
+                    onClick={refreshData}
+                    disabled={refreshing}
+                    style={{
+                      fontSize: isMobile ? '10px' : '12px',
+                      padding: isMobile ? '6px 12px' : '8px 16px',
+                      minWidth: isMobile ? '60px' : '80px',
+                    }}
+                  >
+                    {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
+                  </MDButton>
+
               </MDBox>
               <MDBox pt={isMobile ? 2 : 3}>
                 <MDBox mx={isMobile ? 1 : 2} mb={isMobile ? 2 : 3}>
@@ -1243,6 +1656,27 @@ function Sheet2() {
                     </MDBox>
                   )}
                 </MDBox>
+
+                <MDBox
+                    mx={isMobile ? 1 : 2}
+                    mt={isMobile ? -2 : -3}
+                    py={isMobile ? 2 : 3}
+                    px={isMobile ? 1 : 2}
+                    variant="gradient"
+                    borderRadius="lg"
+                  >
+                    <MDBox mb={isMobile ? 2 : 3}>
+                      <ReportsBarChart
+                        color="info"
+                        title={isAdmin ? "Boiler Statistics by Region" : `${selectedCity || 'Region'} Boiler Statistics`}
+                        description={isAdmin ? "Boiler Statistics by Region" : `Boiler statistics for ${selectedCity || 'selected region'}`}
+                        date="data updated from Google Sheets"
+                        chart={data}
+                      />
+                    </MDBox>
+                      
+                </MDBox>
+                  
                 <MDBox
                   mx={isMobile ? 1 : 2}
                   mt={isMobile ? -2 : -3}
@@ -1255,86 +1689,10 @@ function Sheet2() {
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <ReportsBarChart
-                            color="info"
-                            title={isMobile ? `${selectedCity || 'Region'} : Boiler status` : `${selectedCity || 'Region'} : Boiler status as per various region and total`}
-                            description={isMobile ? `Statistics for ${selectedCity || 'selected region'}` : `Detailed statistics for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={regionalData}
-                          />
-                        </MDBox >
-                          {/* Regional Data Table */}
-                          <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
-                            <Card>
-                              <MDBox
-                                mx={isMobile ? 1 : 2}
-                                mt={isMobile ? -2 : -3}
-                                py={isMobile ? 2 : 3}
-                                px={isMobile ? 1 : 2}
-                                variant="gradient"
-                                bgColor="error"
-                                borderRadius="lg"
-                                coloredShadow="error"
-                              >
-                                <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                  {selectedCity || 'Region'} Boiler Statistics Table
-                                </MDTypography>
-                              </MDBox>
-                              <MDBox pt={isMobile ? 2 : 3}>
-                                <div style={{
-                                  overflowX: 'auto',
-                                  maxWidth: '100%',
-                                  WebkitOverflowScrolling: 'touch',
-                                }}>
-                                  <DataTable
-                                    table={regionalTableData}
-                                    entriesPerPage={{ 
-                                      defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
-                                      entries: isMobile ? [5] : isTablet ? [5] : [5] 
-                                    }}
-                                    canSearch={false}
-                                    showTotalEntries={true}
-                                    isLoading={loading}
-                                    isSorted={false}
-                                    sx={{
-                                      minWidth: isMobile ? '100%' : 'auto',
-                                      minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      '& .MuiTableCell-root': {
-                                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                        borderSpacing: isMobile ? '2px' : '4px',
-                                        fontSize: isMobile ? '12px' : '14px',
-                                        color: darkMode ? '#ffffff' : '#000000',
-                                        fontWeight: '500',
-                                      },
-                                      '& .MuiTableHead-root .MuiTableCell-root': {
-                                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                        fontSize: isMobile ? '12px' : '14px',
-                                        color: darkMode ? '#ffffff' : '#000000',
-                                        fontWeight: 600,
-                                      },
-                                      '& .MuiTableBody-root .MuiTableCell-root': {
-                                        fontSize: isMobile ? '12px' : '14px',
-                                        color: darkMode ? '#ffffff' : '#000000',
-                                        fontWeight: '500',
-                                      },
-                                      '& .MuiTableContainer-root': {
-                                        minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
-                                      },
-                                    }}
-                                  />
-                                </div>
-                              </MDBox>
-                            </Card>
-                          </MDBox>
-
-                      </Grid>
-                      <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
                           <PieChart
                             color="info"
-                            title={isMobile ? `${selectedCity || 'Region'} : Boiler type` : `${selectedCity || 'Region'} : Boiler as per type by region`}
-                            description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler status distribution for ${selectedCity || 'selected region'}`}
+                            title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
+                            description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
                             date="data updated from Google Sheets"
                             chart={pieChartData}
                           />
@@ -1353,7 +1711,7 @@ function Sheet2() {
                               coloredShadow="error"
                             >
                               <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Boiler Type Statistics Table
+                                {selectedCity || 'Region'} Running Boiler as per Type
                               </MDTypography>
                             </MDBox>
                             <MDBox pt={isMobile ? 2 : 3}>
@@ -1404,20 +1762,14 @@ function Sheet2() {
                           </Card>
                         </MDBox>
                       </Grid>
-                    </Grid>
-                  </MDBox>
-                  
-                  
-                  <MDBox mb={isMobile ? 2 : 3}>
-                    <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
                           <PieChart
                             color="success"
-                            title={isMobile ? `${selectedCity || 'Region'} : Fuel type` : `${selectedCity || 'Region'} : Boiler as per fuel by region`}
-                            description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Fuel distribution for ${selectedCity || 'selected region'}`}
+                            title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
+                            description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
                             date="data updated from Google Sheets"
-                            chart={fuelPieChartData}
+                            chart={perFuelUsedPieChartData}
                           />
                         </MDBox>
                         {/* Fuel Type Data Table */}
@@ -1434,7 +1786,7 @@ function Sheet2() {
                               coloredShadow="success"
                             >
                               <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Fuel Type Statistics Table
+                                {selectedCity || 'Region'} Running Boiler as per fuel used
                               </MDTypography>
                             </MDBox>
                             <MDBox pt={isMobile ? 2 : 3}>
@@ -1444,7 +1796,7 @@ function Sheet2() {
                                 WebkitOverflowScrolling: 'touch',
                               }}>
                                 <DataTable
-                                  table={fuelPieChartTableData}
+                                  table={perFuelUsedTableData}
                                   entriesPerPage={{ 
                                     defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
                                     entries: isMobile ? [5] : isTablet ? [5] : [5] 
@@ -1485,18 +1837,92 @@ function Sheet2() {
                           </Card>
                         </MDBox>
                       </Grid>
+                    </Grid>
+                  </MDBox>
+
+                  <MDBox mb={isMobile ? 2 : 3}>
+                    <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
                           <PieChart
-                            color="success"
-                            title={isMobile ? `${selectedCity || 'Region'} : Industry types` : `${selectedCity || 'Region'} : Boiler used in various industry`}
-                            description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `used in various industry for ${selectedCity || 'selected region'}`}
+                            color="warning"
+                            title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
+                            description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
                             date="data updated from Google Sheets"
-                            chart={industryPieChartData}
+                            chart={variousIndustriesPieChartData}
                           />
                         </MDBox>
-                        {/* Industry Type Data Table */}
-                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
+                        <MDBox mb={isMobile ? 1 : 3}>
+                          <PieChart
+                            color="primary"
+                            title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
+                            description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
+                            date="data updated from Google Sheets"
+                            chart={HeatingSurfacePieChartData}
+                          />
+                        </MDBox>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+                    <MDBox mb={isMobile ? 2 : 3}>
+                      <Grid container spacing={isMobile ? 1 : 3}>
+                        <Grid item xs={12} md={6} lg={6}>
+                          <MDBox mb={isMobile ? 1 : 3}>
+                            <ReportsBarChart
+                              color="warning"
+                              title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
+                              description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={perCapacityBarChartData}
+                            />
+                          </MDBox>
+                        </Grid>
+                        <Grid item xs={12} md={6} lg={6}>
+                          <MDBox mb={isMobile ? 1 : 3}>
+                            <ReportsBarChart
+                              color="error"
+                              title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
+                              description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={certificateDataBarChart}
+                            />
+                          </MDBox>
+                        </Grid>
+                      </Grid>
+                    </MDBox>
+
+                    <MDBox mb={isMobile ? 2 : 3}>
+                      <Grid container spacing={isMobile ? 1 : 3}>
+                        <Grid item xs={12} md={6} lg={6}>
+                          <MDBox mb={isMobile ? 1 : 3}>
+                            <ReportsBarChart
+                              color="warning"
+                              title={`${selectedCity || 'Region'} : Boiler as per various district`}
+                              description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={economiserStatusBarChartData}
+                            />
+                          </MDBox>
+                        </Grid>
+                        <Grid item xs={12} md={6} lg={6}>
+                          <MDBox mb={isMobile ? 1 : 3}>
+                          <PieChart
+                            color="success"
+                            title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
+                            description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
+                            date="data updated from Google Sheets"
+                            chart={runningEconomisersPieChartData}
+                          />
+                          </MDBox>
+                        </Grid>
+                      </Grid>
+                    </MDBox>
+
+                    <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
+                      <Grid container spacing={isMobile ? 2 : 6}>
+                        <Grid item xs={12}>
                           <Card>
                             <MDBox
                               mx={isMobile ? 1 : 2}
@@ -1509,7 +1935,7 @@ function Sheet2() {
                               coloredShadow="success"
                             >
                               <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Industry Type Statistics Table
+                                {selectedCity || 'Region'} : Boiler as per Various District
                               </MDTypography>
                             </MDBox>
                             <MDBox pt={isMobile ? 2 : 3}>
@@ -1519,86 +1945,10 @@ function Sheet2() {
                                 WebkitOverflowScrolling: 'touch',
                               }}>
                                 <DataTable
-                                  table={industryPieChartTableData}
+                                  table={perVariousTableData}
                                   entriesPerPage={{ 
-                                    defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
-                                    entries: isMobile ? [5] : isTablet ? [5] : [5] 
-                                  }}
-                                  canSearch={false}
-                                  showTotalEntries={true}
-                                  isLoading={loading}
-                                  isSorted={false}
-                                  sx={{
-                                    minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                                    fontSize: isMobile ? '12px' : '14px',
-                                    '& .MuiTableCell-root': {
-                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                      borderSpacing: isMobile ? '2px' : '4px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableHead-root .MuiTableCell-root': {
-                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: 600,
-                                    },
-                                    '& .MuiTableBody-root .MuiTableCell-root': {
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                  }}
-                                />
-                              </div>
-                            </MDBox>
-                          </Card>
-                        </MDBox>
-                      </Grid>
-                    </Grid>
-                  </MDBox>
-                  <MDBox mb={isMobile ? 2 : 3}>
-                    <Grid container spacing={isMobile ? 1 : 3}>
-                      <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="success"
-                            title={isMobile ? `${selectedCity || 'Region'} : Heating surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2 `}
-                            description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler as per Heating surface in m2 for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={surfacePieChartData}
-                          />
-                        </MDBox>
-                        {/* Heating Surface Data Table */}
-                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
-                          <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="primary"
-                              borderRadius="lg"
-                              coloredShadow="primary"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Heating Surface Statistics Table
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox pt={isMobile ? 2 : 3}>
-                              <div style={{
-                                overflowX: 'auto',
-                                maxWidth: '100%',
-                                WebkitOverflowScrolling: 'touch',
-                              }}>
-                                <DataTable
-                                  table={surfacePieChartTableData}
-                                  entriesPerPage={{ 
-                                    defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
-                                    entries: isMobile ? [5] : isTablet ? [5] : [5] 
+                                    defaultValue: isMobile ? 5 : isTablet ? 8 : 10, 
+                                    entries: isMobile ? [5, 10] : isTablet ? [8, 15] : [10, 20] 
                                   }}
                                   canSearch={false}
                                   showTotalEntries={true}
@@ -1634,251 +1984,64 @@ function Sheet2() {
                               </div>
                             </MDBox>
                           </Card>
-                        </MDBox>
+                        </Grid>
                       </Grid>
-                      <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="success"
-                            title={isMobile ? `${selectedCity || 'Region'} : Capacity TPH` : `${selectedCity || 'Region'} : Boiler as per Capacity in TPH`}
-                            description={isMobile ? `Capacity for ${selectedCity || 'selected region'}` : `Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={CapacityPieChartData}
-                          />
-                        </MDBox>
-                        {/* Capacity Data Table */}
-                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
-                          <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="primary"
-                              borderRadius="lg"
-                              coloredShadow="primary"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Capacity Statistics Table
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox pt={isMobile ? 2 : 3}>
-                              <div style={{
-                                overflowX: 'auto',
-                                maxWidth: '100%',
-                                WebkitOverflowScrolling: 'touch',
-                              }}>
-                                <DataTable
-                                  table={capacityPieChartTableData}
-                                  entriesPerPage={{ 
-                                    defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
-                                    entries: isMobile ? [5] : isTablet ? [5] : [5] 
-                                  }}
-                                  canSearch={false}
-                                  showTotalEntries={true}
-                                  isLoading={loading}
-                                  isSorted={false}
-                                  sx={{
-                                    minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                                    fontSize: isMobile ? '12px' : '14px',
-                                    '& .MuiTableCell-root': {
-                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                      borderSpacing: isMobile ? '2px' : '4px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableHead-root .MuiTableCell-root': {
-                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: 600,
-                                    },
-                                    '& .MuiTableBody-root .MuiTableCell-root': {
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
-                                    },
-                                  }}
-                                />
-                              </div>
-                            </MDBox>
-                          </Card>
-                        </MDBox>
-                      </Grid>
-                    </Grid>
-                  </MDBox>
-                  <MDBox mb={isMobile ? 2 : 3}>
-                    <Grid container spacing={isMobile ? 1 : 3}>
-                      
-                    <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          <ReportsBarChart
-                            color="warning"
-                            title={isMobile ? `${selectedCity || 'Region'} : Certificate types` : `${selectedCity || 'Region'} : Boiler as per type of certificate according to the region`}
-                            description={isMobile ? `Certificate distribution for ${selectedCity || 'selected region'}` : `Certificate distribution for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={certificatesBarChartData}
-                          />
-                        </MDBox>
-                        {/* Certificate Type Data Table */}
-                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
-                          <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="warning"
-                              borderRadius="lg"
-                              coloredShadow="warning"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Certificate Type Statistics Table
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox pt={isMobile ? 2 : 3}>
-                              <div style={{
-                                overflowX: 'auto',
-                                maxWidth: '100%',
-                                WebkitOverflowScrolling: 'touch',
-                              }}>
-                                <DataTable
-                                  key={`certificate-table-1-${selectedCity}-${certificateTablePage}`}
-                                  table={certificatesBarChartTableData}
-                                  entriesPerPage={{ 
-                                    defaultValue: 5, 
-                                    entries: [5, 10, 15, 20] 
-                                  }}
-                                  canSearch={false}
-                                  showTotalEntries={true}
-                                  isLoading={loading}
-                                  isSorted={false}
-                                  onPageChange={(newPage) => {
-                                    setCertificateTablePage(newPage);
-                                  }}
-                                  sx={{
-                                    minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                                    fontSize: isMobile ? '12px' : '14px',
-                                    '& .MuiTableCell-root': {
-                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                      borderSpacing: isMobile ? '2px' : '4px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableHead-root .MuiTableCell-root': {
-                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: 600,
-                                    },
-                                    '& .MuiTableBody-root .MuiTableCell-root': {
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
-                                    },
-                                  }}
-                                />
-                              </div>
-                            </MDBox>
-                          </Card>
-                        </MDBox>
-                      </Grid>
+                    </MDBox>
 
-                      <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          <ReportsBarChart
-                            color="warning"
-                            title={isMobile ? `${selectedCity || 'Region'} : Certificate types` : `${selectedCity || 'Region'} : Boiler as per type of certificate according to the region`}
-                            description={isMobile ? `Certificate distribution for ${selectedCity || 'selected region'}` : `Certificate distribution for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={certificateBarChartData}
-                          />
-                        </MDBox>
-                        {/* Certificate Type Data Table */}
-                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
-                          <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="warning"
-                              borderRadius="lg"
-                              coloredShadow="warning"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Certificate Type Statistics Table
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox pt={isMobile ? 2 : 3}>
-                              <div style={{
-                                overflowX: 'auto',
-                                maxWidth: '100%',
-                                WebkitOverflowScrolling: 'touch',
-                              }}>
-                                <DataTable
-                                  key={`certificate-table-2-${selectedCity}-${certificateTablePage2}`}
-                                  table={certificateBarChartTableData}
-                                  entriesPerPage={{ 
-                                    defaultValue: isMobile ? 5 : isTablet ? 5 : 5, 
-                                    entries: isMobile ? [5] : isTablet ? [5] : [5] 
-                                  }}
-                                  canSearch={false}
-                                  showTotalEntries={true}
-                                  isLoading={loading}
-                                  isSorted={false}
-                                  sx={{
-                                    minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                                    fontSize: isMobile ? '12px' : '14px',
-                                    '& .MuiTableCell-root': {
-                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                      borderSpacing: isMobile ? '2px' : '4px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableHead-root .MuiTableCell-root': {
-                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: 600,
-                                    },
-                                    '& .MuiTableBody-root .MuiTableCell-root': {
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
-                                    },
-                                  }}
+                    {/* Admin-Only Charts Section */}
+                    {isAdmin && (
+                      <>
+                        <Grid container spacing={isMobile ? 1 : 3}>
+                            <Grid item xs={12} md={6} lg={6}>
+                              <MDBox mb={isMobile ? 1 : 3}>
+                                <ReportsBarChart
+                                  color="warning"
+                                  title={`Number of Boiler Registered`}
+                                  description={`Number of Boiler Registered`}
+                                  date="data updated from Google Sheets"
+                                  chart={boilerRegisteredBarChartData}
                                 />
-                              </div>
-                            </MDBox>
-                          </Card>
-                        </MDBox>
-                      </Grid>
+                              </MDBox>
+                            </Grid>
+                            <Grid item xs={12} md={6} lg={6}>
+                              <MDBox mb={isMobile ? 1 : 3}>
+                                <ReportsBarChart
+                                  color="error"
+                                  title={`Number of Boilers/Economisers Manufactured`}
+                                  description={`Number of Boilers/Economisers Manufactured`}
+                                  date="data updated from Google Sheets"
+                                  chart={economisersBarChartData}
+                                />
+                              </MDBox>
+                            </Grid>
+                          </Grid>
+                          
+                          {/* Accidents Line Chart */}
+                          <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                            <DefaultLineChart
+                              icon={{ color: "error", component: "warning" }}
+                              title="Accident Statistics Over Years"
+                              description="Accident trends including total accidents, deaths, and injuries"
+                              height="19.125rem"
+                              chart={accidentsLineChartData}
+                            />
+                          </MDBox>
+                      </>
+                    )}
 
-                      <Grid item xs={12} md={12} lg={12}>
-                              hiii
-                      </Grid>
+                    {/* User-Only Charts Section - City-Specific Accident Statistics */}
+                    {!isAdmin && selectedCity && cityAccidentLineChartData.labels.length > 0 && (
+                      <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                        <DefaultLineChart
+                          icon={{ color: "info", component: "location_city" }}
+                          title={`${selectedCity} - City Accident Statistics`}
+                          description={`Accident trends for ${selectedCity} including total accidents, deaths, and injuries by year`}
+                          height="19.125rem"
+                          chart={cityAccidentLineChartData}
+                        />
+                      </MDBox>
+                    )}
 
-                    </Grid>
-                  </MDBox>
                 </MDBox>
               </MDBox>
             </Card>

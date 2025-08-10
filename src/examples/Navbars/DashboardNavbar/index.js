@@ -28,6 +28,7 @@ import { AuthContext } from "context";
 import logo from "assets/images/logo.png";
 import logo1 from "assets/images/logo1.png";
 import header from "assets/images/header.png";
+import logo2 from "assets/images/log2.png";
 
 
 function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
@@ -112,16 +113,16 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
       sx={(theme) => navbar(theme, { transparentNavbar, absolute, light, darkMode })}
     >
       <Toolbar sx={(theme) => navbarContainer(theme)}>
-          <Grid container spacing={3} pt={3}> 
+          <Grid container spacing={2} pt={3}> 
             {/* First Logo - Hidden on mobile/tablet, visible on desktop */}
-            <Grid item xs={0} md={3} lg={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
                 <MDBox mb={1.5} textAlign='center'>
-                  <img src={logo} alt="logo" style={{width: "100px", height: "100px"}}/>
+                  <img src={logo} alt="logo" style={{width: "80px", height: "80px"}}/>
                 </MDBox>
             </Grid>
             
-            {/* Header Image - Full width on mobile/tablet, 6 columns on desktop */}
-            <Grid item xs={8} md={6} lg={6}>
+            {/* Header Image - Full width on mobile/tablet, 4 columns on desktop */}
+            <Grid item xs={10} md={6} lg={6}>
                 <MDBox mb={1.5} textAlign='center' display="flex" alignItems="center" justifyContent="space-between">
                   <img src={header} alt="header" style={{width: "100%", height: "100px"}}/>
                   
@@ -163,11 +164,19 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
             </Grid>
             
             {/* Third Logo - Hidden on mobile/tablet, visible on desktop */}
-            <Grid item xs={0} md={3} lg={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
                 <MDBox mb={1.5} textAlign='center'>
-                <img src={logo1} alt="logo1" style={{width: "100px", height: "100px"}}/>
+                <img src={logo1} alt="logo1" style={{width: "80px", height: "80px"}}/>
                 </MDBox>
-            </Grid>       
+            </Grid>
+
+            {/* Fourth Logo - Hidden on mobile/tablet, visible on desktop */}
+            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
+                <MDBox mb={1.5} textAlign='center'>
+                <img src={logo2} alt="logo2" style={{width: "80px", height: "80px"}}/>
+                </MDBox>
+            </Grid>
+
           </Grid>
         {isMini ? null : (
           <MDBox sx={(theme) => navbarRow(theme, { isMini })}>
