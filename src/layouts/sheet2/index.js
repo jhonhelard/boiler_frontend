@@ -12,7 +12,7 @@ import { setSheet1 } from "../../redux/sheet1";
 import { setRegions } from "../../redux/regions";
 import axios from "axios";
 import DataTable from "examples/Tables/DataTable";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import ReportsBarChart from "examples/Charts/BarCharts/VerticalBarChart";
 import ReportsLineChart from "examples/Charts/LineCharts/ReportsLineChart";
 import DefaultLineChart from "examples/Charts/LineCharts/DefaultLineChart";
@@ -66,7 +66,7 @@ const useResponsive = () => {
 };
 
 // Registering the necessary chart elements
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ArcElement);
 
 function Sheet2() {
   const dispatch = useDispatch();
@@ -82,6 +82,18 @@ function Sheet2() {
   
   const [certificateTablePage, setCertificateTablePage] = useState(0);
   const [certificateTablePage2, setCertificateTablePage2] = useState(0);
+  
+  // Chart type selection states
+  const [boilerTypeChartType, setBoilerTypeChartType] = useState('Pie Chart');
+  const [fuelTypeChartType, setFuelTypeChartType] = useState('Pie Chart');
+  const [industriesChartType, setIndustriesChartType] = useState('Pie Chart');
+  const [heatingSurfaceChartType, setHeatingSurfaceChartType] = useState('Pie Chart');
+  const [capacityChartType, setCapacityChartType] = useState('Bar Chart');
+  const [certificateChartType, setCertificateChartType] = useState('Bar Chart');
+  const [districtChartType, setDistrictChartType] = useState('Bar Chart');
+  const [economisersChartType, setEconomisersChartType] = useState('Pie Chart');
+  const [boilerRegisteredChartType, setBoilerRegisteredChartType] = useState('Bar Chart');
+  const [economisersManufacturedChartType, setEconomisersManufacturedChartType] = useState('Bar Chart');
   
   const { isAdmin, userInfo } = useContext(AuthContext);
   
@@ -504,6 +516,7 @@ function Sheet2() {
     } else {
       // Regular users only see their selected region
       if (!selectedCity) {
+        console.log("No selected city for user");
         return {
           labels: [],
           datasets: []
@@ -514,25 +527,37 @@ function Sheet2() {
       const selectedRegionData = sheetData2.slice(1).find(row => row[1] === selectedCity);
       
       if (!selectedRegionData) {
+        console.log("No data found for selected city:", selectedCity);
         return {
           labels: [],
           datasets: []
         };
       }
 
-      // Create a single dataset for the selected region
-      const labels = [selectedCity]; // Only show selected city
+      console.log("Selected region data:", selectedRegionData);
+      console.log("Dataset labels:", datasetLabels);
+
+      // Create a single dataset for the selected region with better formatting for user view
+      const labels = datasetLabels; // Use the actual data labels instead of just city name
       
+      // Create a single dataset with all the data points
+      const dataPoints = [];
       for (let i = 2; i <= 5; i++) {
         if (sheetData2[0] && sheetData2[0][i]) {
-          const dataset = {
-            label: datasetLabels[i - 2], // Use dynamic label from header
-            data: [parseInt(selectedRegionData[i]) || 0], // Only one data point for selected city
-            color: colors[i - 2] || "info"
-          };
-          datasets.push(dataset);
+          const value = parseInt(selectedRegionData[i]) || 0;
+          dataPoints.push(value);
         }
       }
+
+      console.log("Data points for user view:", dataPoints);
+
+      // Create a single dataset with all the data
+      const dataset = {
+        label: selectedCity,
+        data: dataPoints,
+        color: "info"
+      };
+      datasets.push(dataset);
 
       return {
         labels,
@@ -1429,6 +1454,72 @@ function Sheet2() {
     };
   }, [isMobile, darkMode]);
 
+  // Helper function to convert pie chart data to bar chart format
+  const convertPieToBarChartData = (pieChartData) => {
+    if (!pieChartData || !pieChartData.labels || !pieChartData.datasets || !pieChartData.datasets.data) {
+      return { labels: [], datasets: [] };
+    }
+    
+    return {
+      labels: pieChartData.labels,
+      datasets: [
+        {
+          label: pieChartData.datasets.label || 'Data',
+          data: pieChartData.datasets.data,
+          color: "info"
+        }
+      ]
+    };
+  };
+
+  // Helper function to convert bar chart data to pie chart format
+  const convertBarToPieChartData = (barChartData) => {
+    if (!barChartData || !barChartData.labels || !barChartData.datasets || !Array.isArray(barChartData.datasets)) {
+      console.log("convertBarToPieChartData: Invalid barChartData structure", barChartData);
+      return { labels: [], datasets: {} };
+    }
+    
+    const firstDataset = barChartData.datasets[0];
+    if (!firstDataset || !firstDataset.data) {
+      console.log("convertBarToPieChartData: Invalid dataset structure", firstDataset);
+      return { labels: [], datasets: {} };
+    }
+    
+    console.log("convertBarToPieChartData: Input data", {
+      labels: barChartData.labels,
+      data: firstDataset.data,
+      datasetLabel: firstDataset.label
+    });
+    
+    // Don't filter out any values - show all data points for the pie chart
+    const labels = barChartData.labels || [];
+    const data = firstDataset.data || [];
+    
+    // Define a better color palette for pie charts
+    const colorPalette = [
+      "info", "success", "error", "warning", "primary", "secondary",
+      "light", "dark"
+    ];
+    
+    // Create background colors array matching the data length
+    const backgroundColors = data.map((_, index) => colorPalette[index % colorPalette.length]);
+    
+    console.log("convertBarToPieChartData: Output data", {
+      labels,
+      data,
+      backgroundColors
+    });
+
+    return {
+      labels: labels,
+      datasets: {
+        label: firstDataset.label || 'Data',
+        data: data,
+        backgroundColors: backgroundColors
+      }
+    };
+  };
+
   // Create table data from regionalData for the chart
   const regionalTableData = createTableDataFromChart(regionalData, "Regional Data");
   // Create table data for pie charts
@@ -1450,14 +1541,33 @@ function Sheet2() {
   }
  
   
-  // Extract total values from totalstate array for ComplexStatisticsCard
+  // Extract values from totalstate array for ComplexStatisticsCard
+  // Show region-specific data when a region is selected, otherwise show totals
   const totalValues = useMemo(() => {
     
     if (totalstate && totalstate.length > 0) {
-      // totalstate is a 2D array from Google Sheets range B3:F11
-      // Each row has 5 columns: [State, Running, NotOffered, Idle, Other]
-      // We need to find the row that contains totals or the last row
+      // If a region is selected, show data for that specific region
+      if (selectedCity) {
+        // Find the row for the selected city
+        const selectedRegionData = totalstate.find(row => 
+          row && row[0] && row[0].toString().toLowerCase() === selectedCity.toLowerCase()
+        );
+        
+        if (selectedRegionData && Array.isArray(selectedRegionData) && selectedRegionData.length >= 4) {
+          // Extract the three values for the selected region
+          const running = parseInt(selectedRegionData[1]) || 0;        // Running Boilers (index 1)
+          const notOffered = parseInt(selectedRegionData[2]) || 0;     // Boiler not offered since last 1 year (index 2)
+          const idle = parseInt(selectedRegionData[3]) || 0;           // Total Idle Boilers (index 3)
+          
+          console.log(`Region-specific data for ${selectedCity}:`, { running, notOffered, idle });
+          
+          return { running, notOffered, idle };
+        } else {
+          console.log(`No data found for selected region: ${selectedCity}, falling back to totals`);
+        }
+      }
       
+      // If no region selected or region not found, show totals
       // Look for a row that might contain totals (usually has "Total" or similar in first column)
       let totalRow = null;
       
@@ -1483,6 +1593,7 @@ function Sheet2() {
         const notOffered = parseInt(totalRow[2]) || 0;     // Boiler not offered since last 1 year (index 2)
         const idle = parseInt(totalRow[3]) || 0;           // Total Idle Boilers (index 3)
         
+        console.log("Using total values:", { running, notOffered, idle });
         
         return { running, notOffered, idle };
       }
@@ -1518,7 +1629,7 @@ function Sheet2() {
       notOffered: 0,
       idle: 0
     };
-  }, [totalstate]);
+  }, [totalstate, selectedCity]);
   
   // console.log(BoilerRegistered, "BoilerRegistered"); // Removed to prevent console spam
   
@@ -1527,28 +1638,44 @@ function Sheet2() {
       <DashboardNavbar />
       {/* ... existing code ... */}
       <Grid container spacing={3} pt={3}>
-        {isAdmin && (
-          <>
-            <Grid item xs={12} md={6} lg={4}>
-              <MDBox mb={1.5}>
-                <ComplexStatisticsCard
-                  icon="leaderboard"
-                  title="Total Running Boilers"
-                  count={totalValues.running.toString()}
-                  percentage={{
-                    color: "success",
-                    amount: "+3%",
-                    label: "than last month",
-                  }}
-                />
-              </MDBox>
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <MDBox mb={1.5}>
-                <ComplexStatisticsCard
-                  icon="store"
-                  title="not offered since last 1 years"
-                  count={totalValues.notOffered.toString()}
+        <>
+          {/* Data Source Indicator */}
+          <Grid item xs={12}>
+            <MDBox mb={2} textAlign="center">
+              <MDTypography variant="body2" color="text" fontWeight="light">
+                {selectedCity ? 
+                  (totalstate && totalstate.find(row => 
+                    row && row[0] && row[0].toString().toLowerCase() === selectedCity.toLowerCase()
+                  )) ? 
+                    `Showing data for ${selectedCity} region` : 
+                    `No data available for ${selectedCity} region - showing totals instead`
+                  : 
+                  "Showing total data across all regions"
+                }
+              </MDTypography>
+            </MDBox>
+          </Grid>
+          
+          <Grid item xs={12} md={6} lg={4}>
+            <MDBox mb={1.5}>
+              <ComplexStatisticsCard
+                icon="leaderboard"
+                title={selectedCity ? `${selectedCity} Running Boilers` : "Total Running Boilers"}
+                count={totalValues.running.toString()}
+                percentage={{
+                  color: "success",
+                  amount: "+3%",
+                  label: "than last month",
+                }}
+              />
+            </MDBox>
+          </Grid>
+          <Grid item xs={12} md={6} lg={4}>
+            <MDBox mb={1.5}>
+              <ComplexStatisticsCard
+                icon="store"
+                title={selectedCity ? `${selectedCity} - Not Offered Since Last 1 Year` : "Not Offered Since Last 1 Year"}
+                count={totalValues.notOffered.toString()}
                   color="success"
                   percentage={{
                     color: "success",
@@ -1562,7 +1689,7 @@ function Sheet2() {
               <MDBox mb={1.5}>
                 <ComplexStatisticsCard
                   icon="table"
-                  title="Total Idle Boilers"
+                  title={selectedCity ? `${selectedCity} Idle Boilers` : "Total Idle Boilers"}
                   count={totalValues.idle.toString()}
                   color="error"
                   percentage={{
@@ -1573,8 +1700,7 @@ function Sheet2() {
                 />
               </MDBox>
             </Grid>
-          </>  
-        )}
+        </>  
       </Grid>
 
       <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
@@ -1600,20 +1726,22 @@ function Sheet2() {
                   City Table
                 </MDTypography>
 
-                <MDButton
-                    variant="gradient"
-                    color="success"
-                    size={isMobile ? "small" : "medium"}
-                    onClick={refreshData}
-                    disabled={refreshing}
-                    style={{
-                      fontSize: isMobile ? '10px' : '12px',
-                      padding: isMobile ? '6px 12px' : '8px 16px',
-                      minWidth: isMobile ? '60px' : '80px',
-                    }}
-                  >
-                    {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
-                  </MDButton>
+                {isAdmin && (
+                  <MDButton
+                      variant="gradient"
+                      color="success"
+                      size={isMobile ? "small" : "medium"}
+                      onClick={refreshData}
+                      disabled={refreshing}
+                      style={{
+                        fontSize: isMobile ? '10px' : '12px',
+                        padding: isMobile ? '6px 12px' : '8px 16px',
+                        minWidth: isMobile ? '60px' : '80px',
+                      }}
+                    >
+                      {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
+                    </MDButton>
+                )}
 
               </MDBox>
               <MDBox pt={isMobile ? 2 : 3}>
@@ -1659,20 +1787,87 @@ function Sheet2() {
 
                 <MDBox
                     mx={isMobile ? 1 : 2}
-                    mt={isMobile ? -2 : -3}
-                    py={isMobile ? 2 : 3}
+                    mt={isAdmin ? -2 : -1}
+                    py={isAdmin ? 2 : 1}
                     px={isMobile ? 1 : 2}
                     variant="gradient"
                     borderRadius="lg"
                   >
-                    <MDBox mb={isMobile ? 2 : 3}>
-                      <ReportsBarChart
-                        color="info"
-                        title={isAdmin ? "Boiler Statistics by Region" : `${selectedCity || 'Region'} Boiler Statistics`}
-                        description={isAdmin ? "Boiler Statistics by Region" : `Boiler statistics for ${selectedCity || 'selected region'}`}
-                        date="data updated from Google Sheets"
-                        chart={data}
-                      />
+                    <MDBox mb={isAdmin ? 2 : 1}>
+                      {isAdmin ? (
+                        <ReportsBarChart
+                          color="info"
+                          title="Boiler Statistics by Region"
+                          description="Boiler Statistics by Region"
+                          date="data updated from Google Sheets"
+                          chart={data}
+                        />
+                      ) : (
+                        <MDBox>
+                          <Grid container spacing={isMobile ? 1 : 3}>
+                            <Grid item xs={12} md={6} lg={6}>
+                              <MDBox
+                                sx={{
+                                  maxWidth: '100%',
+                                  overflow: 'hidden',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                                }}
+                              >
+                                <ReportsBarChart
+                                  color="info"
+                                  title={`${selectedCity || 'Region'} Boiler Statistics`}
+                                  description={`Boiler statistics for ${selectedCity || 'selected region'}`}
+                                  date="data updated from Google Sheets"
+                                  chart={data}
+                                  height={isMobile ? "200px" : "250px"}
+                                />
+                              </MDBox>
+                            </Grid>
+                            <Grid item xs={12} md={6} lg={6}>
+                              <MDBox
+                                sx={{
+                                  maxWidth: '100%',
+                                  overflow: 'hidden',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                                }}
+                              >
+                              <MDBox>
+                                
+                                <PieChart
+                                  color="success"
+                                  title={`${selectedCity || 'Region'} Boiler Statistics Distribution`}
+                                  description={`Pie chart view of boiler statistics for ${selectedCity || 'selected region'}`}
+                                  date="data updated from Google Sheets"
+                                  chart={(() => {
+                                    const pieData = convertBarToPieChartData(data);
+                                    console.log("Pie chart data:", pieData);
+                                    console.log("Original bar chart data:", data);
+                                    
+                                    // Ensure we have valid data for the pie chart
+                                    if (!pieData.labels || pieData.labels.length === 0) {
+                                      console.warn("No labels in pie chart data, using fallback");
+                                      return {
+                                        labels: ["No Data Available"],
+                                        datasets: {
+                                          label: "No Data",
+                                          data: [1],
+                                          backgroundColors: ["light"]
+                                        }
+                                      };
+                                    }
+                                    
+                                    return pieData;
+                                  })()}
+                                  height={isMobile ? "200px" : "250px"}
+                                />
+                              </MDBox>
+                              </MDBox>
+                            </Grid>
+                          </Grid>
+                        </MDBox>
+                      )}
                     </MDBox>
                       
                 </MDBox>
@@ -1689,13 +1884,33 @@ function Sheet2() {
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="info"
-                            title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
-                            description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={pieChartData}
-                          />
+                          {/* Chart Type Selector for Boiler Types */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={boilerTypeChartType}
+                              onChange={(e) => setBoilerTypeChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {boilerTypeChartType === 'Pie Chart' ? (
+                            <PieChart
+                              color="info"
+                              title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
+                              description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={pieChartData}
+                            />
+                          ) : (
+                            <ReportsBarChart
+                              color="info"
+                              title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
+                              description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={convertPieToBarChartData(pieChartData)}
+                            />
+                          )}
                         </MDBox>
                         {/* Boiler Type Data Table */}
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
@@ -1764,13 +1979,33 @@ function Sheet2() {
                       </Grid>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="success"
-                            title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
-                            description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={perFuelUsedPieChartData}
-                          />
+                          {/* Chart Type Selector for Fuel Types */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={fuelTypeChartType}
+                              onChange={(e) => setFuelTypeChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {fuelTypeChartType === 'Pie Chart' ? (
+                            <PieChart
+                              color="success"
+                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
+                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={perFuelUsedPieChartData}
+                            />
+                          ) : (
+                            <ReportsBarChart
+                              color="success"
+                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
+                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={convertPieToBarChartData(perFuelUsedPieChartData)}
+                            />
+                          )}
                         </MDBox>
                         {/* Fuel Type Data Table */}
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
@@ -1844,24 +2079,64 @@ function Sheet2() {
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="warning"
-                            title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
-                            description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={variousIndustriesPieChartData}
-                          />
+                          {/* Chart Type Selector for Industries */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={industriesChartType}
+                              onChange={(e) => setIndustriesChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {industriesChartType === 'Pie Chart' ? (
+                            <PieChart
+                              color="warning"
+                              title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
+                              description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={variousIndustriesPieChartData}
+                            />
+                          ) : (
+                            <ReportsBarChart
+                              color="warning"
+                              title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
+                              description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={convertPieToBarChartData(variousIndustriesPieChartData)}
+                            />
+                          )}
                         </MDBox>
                       </Grid>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="primary"
-                            title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
-                            description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={HeatingSurfacePieChartData}
-                          />
+                          {/* Chart Type Selector for Heating Surface */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={heatingSurfaceChartType}
+                              onChange={(e) => setHeatingSurfaceChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {heatingSurfaceChartType === 'Pie Chart' ? (
+                            <PieChart
+                              color="primary"
+                              title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
+                              description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={HeatingSurfacePieChartData}
+                            />
+                          ) : (
+                            <ReportsBarChart
+                              color="primary"
+                              title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
+                              description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={convertPieToBarChartData(HeatingSurfacePieChartData)}
+                            />
+                          )}
                         </MDBox>
                       </Grid>
                     </Grid>
@@ -1870,24 +2145,64 @@ function Sheet2() {
                       <Grid container spacing={isMobile ? 1 : 3}>
                         <Grid item xs={12} md={6} lg={6}>
                           <MDBox mb={isMobile ? 1 : 3}>
-                            <ReportsBarChart
-                              color="warning"
-                              title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
-                              description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={perCapacityBarChartData}
-                            />
+                            {/* Chart Type Selector for Capacity */}
+                            <MDBox mb={2} display="flex" justifyContent="flex-end">
+                              <MDSelect
+                                value={capacityChartType}
+                                onChange={(e) => setCapacityChartType(e.target.value)}
+                                label="Chart Type"
+                                options={['Pie Chart', 'Bar Chart']}
+                              />
+                            </MDBox>
+                            
+                            {capacityChartType === 'Bar Chart' ? (
+                              <ReportsBarChart
+                                color="warning"
+                                title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
+                                description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={perCapacityBarChartData}
+                              />
+                            ) : (
+                              <PieChart
+                                color="warning"
+                                title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
+                                description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={convertBarToPieChartData(perCapacityBarChartData)}
+                              />
+                            )}
                           </MDBox>
                         </Grid>
                         <Grid item xs={12} md={6} lg={6}>
                           <MDBox mb={isMobile ? 1 : 3}>
-                            <ReportsBarChart
-                              color="error"
-                              title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
-                              description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={certificateDataBarChart}
-                            />
+                            {/* Chart Type Selector for Certificate */}
+                            <MDBox mb={2} display="flex" justifyContent="flex-end">
+                              <MDSelect
+                                value={certificateChartType}
+                                onChange={(e) => setCertificateChartType(e.target.value)}
+                                label="Chart Type"
+                                options={['Pie Chart', 'Bar Chart']}
+                              />
+                            </MDBox>
+                            
+                            {certificateChartType === 'Bar Chart' ? (
+                              <ReportsBarChart
+                                color="error"
+                                title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
+                                description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={certificateDataBarChart}
+                              />
+                            ) : (
+                              <PieChart
+                                color="error"
+                                title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
+                                description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={convertBarToPieChartData(certificateDataBarChart)}
+                              />
+                            )}
                           </MDBox>
                         </Grid>
                       </Grid>
@@ -1897,24 +2212,64 @@ function Sheet2() {
                       <Grid container spacing={isMobile ? 1 : 3}>
                         <Grid item xs={12} md={6} lg={6}>
                           <MDBox mb={isMobile ? 1 : 3}>
-                            <ReportsBarChart
-                              color="warning"
-                              title={`${selectedCity || 'Region'} : Boiler as per various district`}
-                              description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={economiserStatusBarChartData}
-                            />
+                            {/* Chart Type Selector for District */}
+                            <MDBox mb={2} display="flex" justifyContent="flex-end">
+                              <MDSelect
+                                value={districtChartType}
+                                onChange={(e) => setDistrictChartType(e.target.value)}
+                                label="Chart Type"
+                                options={['Pie Chart', 'Bar Chart']}
+                              />
+                            </MDBox>
+                            
+                            {districtChartType === 'Bar Chart' ? (
+                              <ReportsBarChart
+                                color="warning"
+                                title={`${selectedCity || 'Region'} : Boiler as per various district`}
+                                description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={economiserStatusBarChartData}
+                              />
+                            ) : (
+                              <PieChart
+                                color="warning"
+                                title={`${selectedCity || 'Region'} : Boiler as per various district`}
+                                description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={convertBarToPieChartData(economiserStatusBarChartData)}
+                              />
+                            )}
                           </MDBox>
                         </Grid>
                         <Grid item xs={12} md={6} lg={6}>
                           <MDBox mb={isMobile ? 1 : 3}>
-                          <PieChart
-                            color="success"
-                            title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
-                            description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
-                            date="data updated from Google Sheets"
-                            chart={runningEconomisersPieChartData}
-                          />
+                            {/* Chart Type Selector for Economisers */}
+                            <MDBox mb={2} display="flex" justifyContent="flex-end">
+                              <MDSelect
+                                value={economisersChartType}
+                                onChange={(e) => setEconomisersChartType(e.target.value)}
+                                label="Chart Type"
+                                options={['Pie Chart', 'Bar Chart']}
+                              />
+                            </MDBox>
+                            
+                            {economisersChartType === 'Pie Chart' ? (
+                              <PieChart
+                                color="success"
+                                title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
+                                description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={runningEconomisersPieChartData}
+                              />
+                            ) : (
+                              <ReportsBarChart
+                                color="success"
+                                title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
+                                description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
+                                date="data updated from Google Sheets"
+                                chart={convertPieToBarChartData(runningEconomisersPieChartData)}
+                              />
+                            )}
                           </MDBox>
                         </Grid>
                       </Grid>
@@ -1994,24 +2349,64 @@ function Sheet2() {
                         <Grid container spacing={isMobile ? 1 : 3}>
                             <Grid item xs={12} md={6} lg={6}>
                               <MDBox mb={isMobile ? 1 : 3}>
-                                <ReportsBarChart
-                                  color="warning"
-                                  title={`Number of Boiler Registered`}
-                                  description={`Number of Boiler Registered`}
-                                  date="data updated from Google Sheets"
-                                  chart={boilerRegisteredBarChartData}
-                                />
+                                {/* Chart Type Selector for Boiler Registered */}
+                                <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                  <MDSelect
+                                    value={boilerRegisteredChartType}
+                                    onChange={(e) => setBoilerRegisteredChartType(e.target.value)}
+                                    label="Chart Type"
+                                    options={['Bar Chart', 'Pie Chart']}
+                                  />
+                                </MDBox>
+                                
+                                {boilerRegisteredChartType === 'Bar Chart' ? (
+                                  <ReportsBarChart
+                                    color="warning"
+                                    title={`Number of Boiler Registered`}
+                                    description={`Number of Boiler Registered`}
+                                    date="data updated from Google Sheets"
+                                    chart={boilerRegisteredBarChartData}
+                                  />
+                                ) : (
+                                  <PieChart
+                                    color="warning"
+                                    title={`Number of Boiler Registered`}
+                                    description={`Number of Boiler Registered`}
+                                    date="data updated from Google Sheets"
+                                    chart={convertBarToPieChartData(boilerRegisteredBarChartData)}
+                                  />
+                                )}
                               </MDBox>
                             </Grid>
                             <Grid item xs={12} md={6} lg={6}>
                               <MDBox mb={isMobile ? 1 : 3}>
-                                <ReportsBarChart
-                                  color="error"
-                                  title={`Number of Boilers/Economisers Manufactured`}
-                                  description={`Number of Boilers/Economisers Manufactured`}
-                                  date="data updated from Google Sheets"
-                                  chart={economisersBarChartData}
-                                />
+                                {/* Chart Type Selector for Economisers Manufactured */}
+                                <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                  <MDSelect
+                                    value={economisersManufacturedChartType}
+                                    onChange={(e) => setEconomisersManufacturedChartType(e.target.value)}
+                                    label="Chart Type"
+                                    options={['Bar Chart', 'Pie Chart']}
+                                  />
+                                </MDBox>
+                                
+                                {economisersManufacturedChartType === 'Bar Chart' ? (
+                                  <ReportsBarChart
+                                    color="error"
+                                    title={`Number of Boilers/Economisers Manufactured`}
+                                    description={`Number of Boilers/Economisers Manufactured`}
+                                    date="data updated from Google Sheets"
+                                    chart={economisersBarChartData}
+                                  />
+                                ) : (
+                                  <PieChart
+                                    color="error"
+                                    title={`Number of Boilers/Economisers Manufactured`}
+                                    description={`Number of Boilers/Economisers Manufactured`}
+                                    date="data updated from Google Sheets"
+                                    chart={convertBarToPieChartData(economisersBarChartData)}
+                                  />
+                                )}
                               </MDBox>
                             </Grid>
                           </Grid>

@@ -122,7 +122,7 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
             </Grid>
             
             {/* Header Image - Full width on mobile/tablet, 4 columns on desktop */}
-            <Grid item xs={10} md={6} lg={6}>
+            <Grid item xs={6} md={6} lg={6}>
                 <MDBox mb={1.5} textAlign='center' display="flex" alignItems="center" justifyContent="space-between">
                   <img src={header} alt="header" style={{width: "100%", height: "100px"}}/>
                   

@@ -26,6 +26,25 @@ function configs(labels, datasets) {
         legend: {
           display: false,
         },
+        tooltip: {
+          enabled: true,
+          mode: 'nearest',
+          intersect: false,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#ffffff',
+          borderWidth: 1,
+          cornerRadius: 6,
+          displayColors: true,
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y || context.parsed || 0;
+              return `${label}: ${value}`;
+            }
+          }
+        },
       },
       interaction: {
         intersect: false,
