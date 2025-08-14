@@ -18,7 +18,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 // Authentication layout components
-import CoverLayout from "layouts/authentication/components/CoverLayout";
+import BasicLayoutLanding from "layouts/authentication/components/BasicLayoutLanding";
 
 // Images
 import bgImage from "assets/images/bg-sign-up-cover.jpeg";
@@ -190,7 +190,7 @@ function Register() {
   };
 
   return (
-    <CoverLayout image={bgImage}>
+    <BasicLayoutLanding image={bgImage}>
       <Card>
         <MDBox
           variant="gradient"
@@ -370,7 +370,7 @@ function Register() {
           </MDBox>
         </MDBox>
       </Card>
-    </CoverLayout>
+    </BasicLayoutLanding>
   );
 }
 

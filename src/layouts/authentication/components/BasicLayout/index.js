@@ -38,7 +38,10 @@ function BasicLayout({ image, children }) {
             flexDirection: "column",
             justifyContent: "center",
           }}
-        >
+        > 
+        
+          <div>hello</div>
+
           <MDBox
             position="relative"
             height="100%"
