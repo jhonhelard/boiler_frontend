@@ -23,10 +23,11 @@ function DataTable({
   pagination = { variant: "gradient", color: "info" },
   isSorted = true,
   noEndBorder = false,
+  defaultPageSize = 10,
 }) {
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
-  const defaultValue = entriesPerPage.defaultValue ? entriesPerPage.defaultValue : 10;
+  const defaultValue = entriesPerPage === false ? defaultPageSize : (entriesPerPage.defaultValue ? entriesPerPage.defaultValue : 10);
   const entries = entriesPerPage.entries
     ? entriesPerPage.entries.map((el) => el.toString())
     : ["5", "10", "15", "20", "25"];
@@ -34,7 +35,13 @@ function DataTable({
   const data = useMemo(() => table.rows, [table]);
 
   const tableInstance = useTable(
-    { columns, data, initialState: { pageIndex: 0 } },
+    { 
+      columns, 
+      data, 
+      initialState: { pageIndex: 0, pageSize: defaultValue || 10 },
+      autoResetPage: false,
+      autoResetGlobalFilter: false
+    },
     useGlobalFilter,
     useSortBy,
     usePagination
@@ -58,7 +65,10 @@ function DataTable({
     state: { pageIndex, pageSize, globalFilter },
   } = tableInstance;
 
-  useEffect(() => setPageSize(defaultValue || 10), [defaultValue]);
+  useEffect(() => {
+    // Only set page size on initial mount, not on every defaultValue change
+    setPageSize(defaultValue || 10);
+  }, []); // Empty dependency array means it only runs once
 
   const setEntriesPerPage = (value) => setPageSize(value);
 
@@ -277,6 +287,7 @@ DataTable.propTypes = {
   }),
   isSorted: PropTypes.bool,
   noEndBorder: PropTypes.bool,
+  defaultPageSize: PropTypes.number,
 };
 
 export default DataTable;

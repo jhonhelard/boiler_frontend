@@ -13,19 +13,19 @@ import Icon from "@mui/material/Icon";
 const baseRoutes = [
   {
     type: "collapse",
-    name: "Sheet1",
-    key: "tables/sheet1",
-    icon: <Icon fontSize="small">delivery_dining</Icon>,
-    route: "/tables/sheet1",
-    component: <Sheet1 />,
+    name: "Dashboard",
+    key: "tables/dashboard",
+    icon: <Icon fontSize="small">dashboard</Icon>,
+    route: "/tables/dashboard",
+    component: <Sheet2 />,
   },
   {
     type: "collapse",
-    name: "Sheet2",
-    key: "tables/sheet2",
+    name: "Boiler Details",
+    key: "tables/boiler-details",
     icon: <Icon fontSize="small">delivery_dining</Icon>,
-    route: "/tables/sheet2",
-    component: <Sheet2 />,
+    route: "/tables/boiler-details",
+    component: <Sheet1 />,
   },
 ];
 

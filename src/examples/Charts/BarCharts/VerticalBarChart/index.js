@@ -36,7 +36,7 @@ import configs from "examples/Charts/BarCharts/VerticalBarChart/configs";
 // Material Dashboard 2 React base styles
 import colors from "assets/theme/base/colors";
 
-function VerticalBarChart({ icon, title, description, height, chart }) {
+function VerticalBarChart({ icon, title, description, height, chart, customOptions }) {
   const chartDatasets = chart.datasets
     ? chart.datasets.map((dataset) => ({
         ...dataset,
@@ -52,6 +52,9 @@ function VerticalBarChart({ icon, title, description, height, chart }) {
     : [];
 
   const { data, options } = configs(chart.labels || [], chartDatasets);
+  
+  // Merge custom options if provided
+  const finalOptions = customOptions ? { ...options, ...customOptions } : options;
 
   const renderChart = (
     <MDBox py={2} pr={2} pl={icon.component ? 1 : 2}>
@@ -88,7 +91,7 @@ function VerticalBarChart({ icon, title, description, height, chart }) {
       {useMemo(
         () => (
           <MDBox height={height}>
-            <Chart type="bar" data={data} options={options} />
+            <Chart type="bar" data={data} options={finalOptions} />
           </MDBox>
         ),
         [chart, height]
@@ -126,6 +129,7 @@ VerticalBarChart.propTypes = {
   description: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   chart: PropTypes.objectOf(PropTypes.array).isRequired,
+  customOptions: PropTypes.object,
 };
 
 export default VerticalBarChart;

@@ -13,8 +13,6 @@ import rtlPlugin from "stylis-plugin-rtl";
 import { getRoutes } from "routes";
 import { setMiniSidenav, setOpenConfigurator, useMaterialUIController } from "context";
 import './App.css';
-import brandDark from "assets/images/logo.png";
-import brandWhite from "assets/images/logo.png";
 
 import Login from "auth/login";
 import Register from "auth/register";
@@ -141,7 +139,7 @@ export default function App() {
     }
     
     if (authContext.isAuthenticated) {
-      return <Navigate to="/tables/sheet1" replace />;
+      return <Navigate to="/tables/dashboard" replace />;
     } else {
       return <Navigate to="/auth/login" replace />;
     }

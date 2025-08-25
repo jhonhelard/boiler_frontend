@@ -33,8 +33,11 @@ import MDTypography from "components/MDTypography";
 // PieChart configurations
 import configs from "examples/Charts/PieChart/configs";
 
-function PieChart({ icon, title, description, height, chart }) {
+function PieChart({ icon, title, description, height, chart, customOptions }) {
   const { data, options } = configs(chart.labels || [], chart.datasets || {});
+  
+  // Merge custom options if provided
+  const finalOptions = customOptions ? { ...options, ...customOptions } : options;
 
   const renderChart = (
     <MDBox py={2} pr={2} pl={icon.component ? 1 : 2}>
@@ -71,7 +74,7 @@ function PieChart({ icon, title, description, height, chart }) {
       {useMemo(
         () => (
           <MDBox height={height}>
-            <Chart type="pie" data={data} options={options} />
+            <Chart type="pie" data={data} options={finalOptions} />
           </MDBox>
         ),
         [chart, height]
@@ -109,6 +112,7 @@ PieChart.propTypes = {
   description: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   chart: PropTypes.objectOf(PropTypes.oneOfType([PropTypes.array, PropTypes.object])).isRequired,
+  customOptions: PropTypes.object,
 };
 
 export default PieChart;

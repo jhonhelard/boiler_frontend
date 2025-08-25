@@ -29,7 +29,7 @@ import logo from "assets/images/logo.png";
 import logo1 from "assets/images/logo1.png";
 import header from "assets/images/header.png";
 import logo2 from "assets/images/log2.png";
-
+import useResponsive from "./useResponsive";
 
 function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
   const authContext = useContext(AuthContext);
@@ -41,6 +41,8 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
   const [searchValue, setSearchValue] = useState("");
   const dispatch1 = useDispatch(); // Initialize Redux dispatch
   
+  const { isMobile, isTablet } = useResponsive();
+
   useEffect(() => {
     if (fixedNavbar) {
       setNavbarType("sticky");
@@ -113,18 +115,31 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
       sx={(theme) => navbar(theme, { transparentNavbar, absolute, light, darkMode })}
     >
       <Toolbar sx={(theme) => navbarContainer(theme)}>
-          <Grid container spacing={2} pt={3}> 
+          <Grid container spacing={2}> 
             {/* First Logo - Hidden on mobile/tablet, visible on desktop */}
-            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
-                <MDBox mb={1.5} textAlign='center'>
+            <Grid item xs={0} md={3} lg={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+                <MDBox textAlign='center'>
                   <img src={logo} alt="logo" style={{width: "80px", height: "80px"}}/>
                 </MDBox>
             </Grid>
             
             {/* Header Image - Full width on mobile/tablet, 4 columns on desktop */}
-            <Grid item xs={6} md={6} lg={6}>
-                <MDBox mb={1.5} textAlign='center' display="flex" alignItems="center" justifyContent="space-between">
-                  <img src={header} alt="header" style={{width: "100%", height: "100px"}}/>
+            <Grid item xs={7} md={6} lg={6}>
+                <MDBox textAlign='center' display="flex" alignItems="center" justifyContent="space-between">
+                  <img 
+                    src={header} 
+                    alt="header" 
+                    style={{ width: "100%", height: isMobile ? '60px' : '100px',}}
+                    sx={{
+                      height: {
+                        xs: "50px",    // Mobile: 60px
+                        sm: "50px",    // Small tablet: 70px  
+                        md: "60px",    // Medium tablet: 80px
+                        lg: "70px",    // Large tablet: 90px
+                        xl: "80px"    // Desktop: 100px
+                      }
+                    }}
+                  />
                   
                   {/* Mobile Buttons Container - Only visible on mobile/tablet */}
                   <MDBox sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1, ml: 2 }}>
@@ -162,18 +177,11 @@ function DashboardNavbar({ absolute = false, light = false, isMini = false }) {
                   </MDBox>
                 </MDBox>
             </Grid>
-            
-            {/* Third Logo - Hidden on mobile/tablet, visible on desktop */}
-            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
-                <MDBox mb={1.5} textAlign='center'>
-                <img src={logo1} alt="logo1" style={{width: "80px", height: "80px"}}/>
-                </MDBox>
-            </Grid>
-
+          
             {/* Fourth Logo - Hidden on mobile/tablet, visible on desktop */}
-            <Grid item xs={0} md={2} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
-                <MDBox mb={1.5} textAlign='center'>
-                <img src={logo2} alt="logo2" style={{width: "80px", height: "80px"}}/>
+            <Grid item xs={0} md={3} lg={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+                <MDBox textAlign='center'>
+                <img src={logo2} alt="logo2" style={{width: "50px", height: "80px"}}/>
                 </MDBox>
             </Grid>
 

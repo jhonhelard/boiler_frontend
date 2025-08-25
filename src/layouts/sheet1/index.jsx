@@ -9,9 +9,9 @@ import DataTable from "examples/Tables/DataTable";
 import { useSelector, useDispatch } from "react-redux";
 import { useEffect, useState, useContext } from "react";
 import { setSheet } from "../../redux/sheet";
-import axios from "axios";
 import { notification } from "antd";
 import { useMaterialUIController } from "context";
+import SheetService from "../../services/sheet-service";
 
 // Custom hook for responsive design
 const useResponsive = () => {
@@ -98,15 +98,18 @@ function Tables() {
   const fetchSheet = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/sheet-data");
-      dispatch(setSheet(res.data[0]));
+      const data = await SheetService.getSheetData();      
+      dispatch(setSheet(data[0]));
     } catch (err) {
+      console.error("Error fetching sheet data:", err);
       dispatch(setSheet([]));
+      notification.error({
+        message: "Error",
+        description: "Failed to fetch sheet data. Please try again later.",
+      });
     }
     setLoading(false);
   };
-
-
 
   useEffect(() => {
     fetchSheet();

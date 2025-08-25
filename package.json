@@ -36,6 +36,7 @@
     "react-toastify": "^10.0.5",
     "recompose": "^0.30.0",
     "redux": "^5.0.1",
+    "redux-persist": "^6.0.0",
     "redux-thunk": "^3.1.0",
     "stylis": "^4.3.0",
     "stylis-plugin-rtl": "2.1.1",
