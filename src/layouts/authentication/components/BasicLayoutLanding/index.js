@@ -47,7 +47,7 @@ function BasicLayout({ image, children }) {
             backgroundRepeat: "no-repeat",
           }}
         >
-          <Grid container spacing={2} pt={3}> 
+          <Grid container spacing={2} pt={3} style={{backgroundColor: "white", opacity: "0.9"}}> 
             {/* First Logo - Hidden on mobile/tablet, visible on desktop */}
             <Grid item xs={0} md={3} lg={3} sx={{ display: { xs: 'none', md: 'block' } }}>
                 <MDBox mb={1.5} textAlign='center'>
@@ -92,7 +92,6 @@ function BasicLayout({ image, children }) {
                     width="80%"
                   >
                     <Typography variant="h3" style={{ color: "white" }}>
-                      Log in INDIA-BOILER
                     </Typography>
                   </MDBox>
                 </MDBox>

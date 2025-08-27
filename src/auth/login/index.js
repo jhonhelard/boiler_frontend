@@ -131,15 +131,6 @@ function Login() {
           <MDTypography variant="h4" fontWeight="medium" color="white" mt={1}>
             Sign in
           </MDTypography>
-          <Grid container spacing={3} justifyContent="center" sx={{ mt: 1, mb: 2 }}>
-            {[FacebookIcon, GitHubIcon, GoogleIcon].map((Icon, index) => (
-              <Grid item xs={2} key={index}>
-                <MDTypography component={MuiLink} href="#" variant="body1" color="white">
-                  <Icon color="inherit" />
-                </MDTypography>
-              </Grid>
-            ))}
-          </Grid>
         </MDBox>
         <MDBox pt={4} pb={3} px={3}>
           <MDBox component="form" role="form" method="POST" onSubmit={submitHandler}>
