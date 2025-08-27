@@ -2076,7 +2076,7 @@ function Sheet2() {
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
                           {/* Chart Type Selector for Boiler Types */}
-                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                          <MDBox mb={2} display="flex" justifyContent="flex-end" style={{marginTop: "20px"}}>
                             <MDSelect
                               value={boilerTypeChartType}
                               onChange={(e) => setBoilerTypeChartType(e.target.value)}
@@ -2103,6 +2103,38 @@ function Sheet2() {
                             />
                           )}
                         </MDBox>
+
+                        <MDBox mb={isMobile ? 1 : 3}>
+                          {/* Chart Type Selector for Fuel Types */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end" style={{marginTop: "45px"}}>
+                            <MDSelect
+                              value={fuelTypeChartType}
+                              onChange={(e) => setFuelTypeChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {fuelTypeChartType === 'Pie Chart' ? (
+                            <PieChart
+                              color="success"
+                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
+                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={perFuelUsedPieChartData}
+                            />
+                          ) : (
+                            <ReportsBarChart
+                              color="success"
+                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
+                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
+                              date="data updated from Google Sheets"
+                              chart={convertPieToBarChartData(perFuelUsedPieChartData)}
+                            />
+                          )}
+                        </MDBox>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
                         {/* Boiler Type Data Table */}
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
                           <Card>
@@ -2116,7 +2148,7 @@ function Sheet2() {
                               borderRadius="lg"
                               coloredShadow="error"
                             >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
+                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
                                 {selectedCity || 'Region'} Running Boiler as per Type
                               </MDTypography>
                             </MDBox>
@@ -2165,37 +2197,7 @@ function Sheet2() {
                             </MDBox>
                           </Card>
                         </MDBox>
-                      </Grid>
-                      <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          {/* Chart Type Selector for Fuel Types */}
-                          <MDBox mb={2} display="flex" justifyContent="flex-end">
-                            <MDSelect
-                              value={fuelTypeChartType}
-                              onChange={(e) => setFuelTypeChartType(e.target.value)}
-                              label="Chart Type"
-                              options={['Pie Chart', 'Bar Chart']}
-                            />
-                          </MDBox>
-                          
-                          {fuelTypeChartType === 'Pie Chart' ? (
-                            <PieChart
-                              color="success"
-                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
-                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={perFuelUsedPieChartData}
-                            />
-                          ) : (
-                            <ReportsBarChart
-                              color="success"
-                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
-                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={convertPieToBarChartData(perFuelUsedPieChartData)}
-                            />
-                          )}
-                        </MDBox>
+                        
                         {/* Fuel Type Data Table */}
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
                           <Card>
