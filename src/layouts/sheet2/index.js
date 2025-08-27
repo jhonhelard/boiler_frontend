@@ -85,6 +85,18 @@ function Sheet2() {
   
   const { isAdmin, userInfo } = useContext(AuthContext);
   
+  // Suppress debug console logs while this page is mounted
+  useEffect(() => {
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    console.log = () => {};
+    console.warn = () => {};
+    return () => {
+      console.log = originalLog;
+      console.warn = originalWarn;
+    };
+  }, []);
+
   const [perType, setPerType] = useState([]);
   const [totalstate, setTotalstate] = useState([]);
   const [perFuelUsed, setPerFuelUsed] = useState([]);
@@ -1503,7 +1515,6 @@ function Sheet2() {
       }
     }
     
-    console.log("Using default values for ComplexStatisticsCard"); // Debug log
     return {
       running: 0,
       notOffered: 0,
@@ -1546,8 +1557,7 @@ function Sheet2() {
                 count={totalValues.running.toString()}
                 percentage={{
                   color: "success",
-                  amount: "+3%",
-                  label: "than last month",
+                  label: "Running Boilers",
                 }}
               />
             </MDBox>
@@ -1561,8 +1571,7 @@ function Sheet2() {
                   color="success"
                   percentage={{
                     color: "success",
-                    amount: "+3%",
-                    label: "than last month",
+                    label: "Not Offered Since Last 1 Year",
                   }}
                 />
               </MDBox>
@@ -1576,8 +1585,7 @@ function Sheet2() {
                   color="error"
                   percentage={{
                     color: "success",
-                    amount: "+3%",
-                    label: "than last month",
+                    label: "Idle Boilers",
                   }}
                 />
               </MDBox>
@@ -1850,12 +1858,8 @@ function Sheet2() {
                                       date="data updated from Google Sheets"
                                       chart={(() => {
                                         const pieData = convertBarToPieChartData(data);
-                                        console.log("Pie chart data:", pieData);
-                                        console.log("Original bar chart data:", data);
-                                        
                                         // Ensure we have valid data for the pie chart
                                         if (!pieData.labels || pieData.labels.length === 0) {
-                                          console.warn("No labels in pie chart data, using fallback");
                                           return {
                                             labels: ["No Data Available"],
                                             datasets: {

@@ -92,7 +92,16 @@ function DefaultLineChart({ icon, title, description, height, chart }) {
       {useMemo(
         () => (
           <MDBox height={height}>
-            <Chart type="line" data={data} options={options} />
+            <MDBox sx={{ overflowX: "auto", width: "100%", height: "100%" }}>
+              <MDBox
+                sx={{
+                  minWidth: `${Math.max(600, (data.labels && data.labels.length ? data.labels.length : 0) * 80)}px`,
+                  height: "100%",
+                }}
+              >
+                <Chart type="line" data={data} options={options} />
+              </MDBox>
+            </MDBox>
           </MDBox>
         ),
         [chart, height]

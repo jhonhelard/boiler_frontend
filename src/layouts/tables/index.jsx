@@ -541,8 +541,8 @@ function Tables() {
               count={adminCount}
               percentage={{
                 color: "success",
-                amount: "+3%",
-                label: "than last month",
+                amount: "admin",
+                label: "counts",
               }}
             />
           </MDBox>
@@ -556,8 +556,8 @@ function Tables() {
               count={userCount}
               percentage={{
                 color: "success",
-                amount: "+1%",
-                label: "than last month",
+                amount: "user",
+                label: "counts",
               }}
             />
           </MDBox>

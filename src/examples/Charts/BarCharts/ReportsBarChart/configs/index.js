@@ -78,6 +78,9 @@ function configs(labels, datasets) {
           },
           ticks: {
             display: true,
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
             color: "#f8f9fa",
             padding: 10,
             font: {

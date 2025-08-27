@@ -236,7 +236,7 @@ function Tables() {
                 }}
               >
                 <MDTypography variant="h6" color="white">
-                  Sheet1 Table
+                  Boiler Details
                 </MDTypography>
                 
                 <MDBox sx={{ 

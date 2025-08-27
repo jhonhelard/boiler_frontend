@@ -176,8 +176,8 @@ function CityTables() {
               count={cities.length}
               percentage={{
                 color: "success",
-                amount: "+3%",
-                label: "than last month",
+                amount: "City",
+                label: "counts",
               }}
             />
           </MDBox>
