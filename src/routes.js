@@ -27,6 +27,13 @@ const baseRoutes = [
     route: "/tables/boiler-details",
     component: <Sheet1 />,
   },
+  {
+    type: "collapse",
+    name: "GIS Mapping",
+    key: "gis-mapping",
+    icon: <Icon fontSize="small">map</Icon>,
+    href: "/Mapping.html",
+  },
 ];
 
 // Admin-only routes
