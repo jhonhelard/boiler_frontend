@@ -26,6 +26,7 @@ import MDButton from "components/MDButton";
 import { useMaterialUIController } from "context";
 import useResponsive from "./useResponsive";
 import { convertPieToBarChartData, convertBarToPieChartData, processPieChartData, processBarChartData } from "./chartUtils";
+import { Autocomplete, TextField } from "@mui/material";
 
 // Add global test function
 window.testUserRegion = () => {
@@ -85,8 +86,19 @@ function Sheet2() {
   
   // API Boiler Summary filter state
   const [selectedServiceType, setSelectedServiceType] = useState('Select All');
+  const [serviceTypeSearchValue, setServiceTypeSearchValue] = useState('Select All');
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState('Select All');
   
   const { isAdmin, userInfo } = useContext(AuthContext);
+  
+  // Debounce search input to prevent too many re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(serviceTypeSearchValue);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [serviceTypeSearchValue]);
   
   // Suppress debug console logs while this page is mounted
   useEffect(() => {
@@ -1745,14 +1757,19 @@ function Sheet2() {
         notDeliveredOnTime: item["is NOT Delivered on time"] || item["is NOT Delivered ontime"] || 0,
       }));
 
-      // Filter rows based on selected service type
+      // Filter rows based on selected service type or search input
       if (selectedServiceType !== 'Select All') {
         rows = rows.filter(row => row.serviceType === selectedServiceType);
+      } else if (debouncedSearchValue && debouncedSearchValue !== 'Select All') {
+        // Real-time filtering based on search input
+        rows = rows.filter(row => 
+          row.serviceType.toLowerCase().includes(debouncedSearchValue.toLowerCase())
+        );
       }
 
       return { columns, rows };
     };
-  }, [ApiBoilerSummaryData, selectedServiceType, isMobile, darkMode]);
+  }, [ApiBoilerSummaryData, selectedServiceType, debouncedSearchValue, isMobile, darkMode]);
 
   // Create table data from regionalData for the chart
   const regionalTableData = createTableDataFromChart(regionalData, "Regional Data");
@@ -1769,18 +1786,29 @@ function Sheet2() {
   // Generate dropdown options for service type filter
   const serviceTypeOptions = useMemo(() => {
     if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData) || ApiBoilerSummaryData.length === 0) {
-      return ['Select All'];
+      return [{ label: 'Select All', value: 'Select All' }];
     }
     
-    const options = ['Select All'];
+    const options = [{ label: 'Select All', value: 'Select All' }];
     ApiBoilerSummaryData.forEach((item) => {
-      if (item.serviceType && !options.includes(item.serviceType)) {
-        options.push(item.serviceType);
+      if (item.serviceType && !options.some(opt => opt.value === item.serviceType)) {
+        options.push({ label: item.serviceType, value: item.serviceType });
       }
     });
     
     return options;
   }, [ApiBoilerSummaryData]);
+
+  // Filtered options based on search input
+  const filteredServiceTypeOptions = useMemo(() => {
+    if (!serviceTypeSearchValue || serviceTypeSearchValue === 'Select All') {
+      return serviceTypeOptions;
+    }
+    
+    return serviceTypeOptions.filter(option => 
+      option.label.toLowerCase().includes(serviceTypeSearchValue.toLowerCase())
+    );
+  }, [serviceTypeOptions, serviceTypeSearchValue]);
   
   const variousIndustriesTableData = createTableDataFromChart(variousIndustriesPieChartData, "Various Industries Data");
   const HeatingSurfaceTableData = createTableDataFromChart(HeatingSurfacePieChartData, "Heating Surface Data");
@@ -4179,31 +4207,80 @@ function Sheet2() {
                     <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '12px' : '14px' }}>
                       Filter by Service Type:
                     </MDTypography>
-                    <MDSelect
-                      value={selectedServiceType}
-                      onChange={(e) => setSelectedServiceType(e.target.value)}
-                      label=""
-                      // label="Service Type"
-                      options={serviceTypeOptions}
-                      sx={{
-                        minWidth: isMobile ? '150px' : '200px',
-                        '& .MuiSelect-select': {
-                          color: 'white',
-                          fontSize: isMobile ? '12px' : '14px',
-                        },
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255, 255, 255, 0.5)',
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'white',
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'white',
-                        },
-                        '& .MuiSvgIcon-root': {
-                          color: 'white',
-                        },
+                    <Autocomplete
+                      value={serviceTypeOptions.find(option => option.value === selectedServiceType) || serviceTypeOptions[0]}
+                      onChange={(event, newValue) => {
+                        if (newValue) {
+                          setSelectedServiceType(newValue.value);
+                          setServiceTypeSearchValue(newValue.value);
+                        } else {
+                          // Handle clear action
+                          setSelectedServiceType('Select All');
+                          setServiceTypeSearchValue('Select All');
+                        }
                       }}
+                      onInputChange={(event, newInputValue) => {
+                        setServiceTypeSearchValue(newInputValue);
+                        // Reset selectedServiceType when user starts typing
+                        if (newInputValue && newInputValue !== selectedServiceType) {
+                          setSelectedServiceType('Select All');
+                        }
+                      }}
+                      options={filteredServiceTypeOptions}
+                      getOptionLabel={(option) => option.label}
+                      isOptionEqualToValue={(option, value) => option.value === value.value}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          variant="outlined"
+                          placeholder="Search service type..."
+                          sx={{
+                            minWidth: isMobile ? '150px' : '200px',
+                            '& .MuiOutlinedInput-root': {
+                              color: 'white',
+                              fontSize: isMobile ? '12px' : '14px',
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.5)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'white',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'white',
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                              fontSize: isMobile ? '12px' : '14px',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              opacity: 1,
+                            },
+                            '& .MuiSvgIcon-root': {
+                              color: 'white',
+                            },
+                          }}
+                        />
+                      )}
+                      renderOption={(props, option) => (
+                        <li {...props} style={{ 
+                          fontSize: isMobile ? '12px' : '14px',
+                          padding: isMobile ? '8px 12px' : '12px 16px'
+                        }}>
+                          {option.label}
+                        </li>
+                      )}
+                      ListboxProps={{
+                        style: {
+                          maxHeight: '200px',
+                          fontSize: isMobile ? '12px' : '14px',
+                        }
+                      }}
+                      noOptionsText="No service types found"
+                      clearOnEscape
+                      selectOnFocus
+                      handleHomeEndKeys
                     />
                   </MDBox>
                 </MDBox>
