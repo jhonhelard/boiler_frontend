@@ -23,11 +23,18 @@ function configs(labels, datasets) {
   const backgroundColors = [];
 
   if (datasets.backgroundColors) {
-    datasets.backgroundColors.forEach((color) =>
-      gradients[color]
-        ? backgroundColors.push(gradients[color].state)
-        : backgroundColors.push(dark.main)
-    );
+    datasets.backgroundColors.forEach((color) => {
+      if (typeof color === "string" && gradients[color]) {
+        backgroundColors.push(gradients[color].state);
+        return;
+      }
+      // Accept raw CSS colors (hex/rgb/hsl) or gradient tokens; otherwise fallback
+      if (typeof color === "string" && (/^#/.test(color) || /^rgb/.test(color) || /^hsl/.test(color))) {
+        backgroundColors.push(color);
+      } else {
+        backgroundColors.push(dark.main);
+      }
+    });
   } else {
     backgroundColors.push(dark.main);
   }

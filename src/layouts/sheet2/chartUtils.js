@@ -28,10 +28,10 @@ export const processPieChartData = (dataArray, selectedCity) => {
   }
 
   const backgroundColors = [
-    "info", "success", "error", "warning", "primary", "secondary",
-    "light", "dark", "info", "success", "error", "warning",
-    "primary", "secondary", "light", "dark", "info", "success",
-    "error", "warning", "primary", "secondary", "light", "dark"
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+    "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+    "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+    "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
   ];
 
   return {
@@ -106,20 +106,22 @@ export const convertPieToBarChartData = (pieChartData) => {
 
 export const convertBarToPieChartData = (barChartData) => {
   if (!barChartData || !barChartData.labels || !barChartData.datasets || !Array.isArray(barChartData.datasets)) {
-    return { labels: [], datasets: {} };
+    return { labels: [], datasets: [] };
   }
   
   const firstDataset = barChartData.datasets[0];
   if (!firstDataset || !firstDataset.data) {
-    return { labels: [], datasets: {} };
+    return { labels: [], datasets: [] };
   }
   
   const labels = barChartData.labels || [];
   const data = firstDataset.data || [];
   
   const colorPalette = [
-    "info", "success", "error", "warning", "primary", "secondary",
-    "light", "dark"
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+    "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+    "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+    "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
   ];
   
   const backgroundColors = data.map((_, index) => colorPalette[index % colorPalette.length]);

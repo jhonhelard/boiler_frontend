@@ -204,11 +204,12 @@ function Tables() {
         })
       : [];
 
-  // Filter rows by search only in the first column
+  // Filter rows by search in the first two visible columns (e.g., Boiler No and Firms Name)
   if (search && visibleKeys.length > 0) {
-    const firstColumnKey = visibleKeys[0];
+    const searchLower = search.toLowerCase();
+    const columnsToSearch = [visibleKeys[0], visibleKeys[1]].filter(Boolean);
     rows = rows.filter((row) =>
-      (row[firstColumnKey] || "").toString().toLowerCase().includes(search.toLowerCase())
+      columnsToSearch.some((key) => ((row[key] || "").toString().toLowerCase().includes(searchLower)))
     );
   }
   
@@ -246,7 +247,7 @@ function Tables() {
                   flexDirection: isMobile ? "column" : "row"
                 }}>
                   <MDInput
-                    placeholder={isMobile ? "Search..." : `Search by ${allTitles[visibleKeys[0]] || "first column"}`}
+                    placeholder={isMobile ? "Search Boiler No / Firm Name" : `Search by ${allTitles[visibleKeys[0]] || "Boiler No"} or ${allTitles[visibleKeys[1]] || "Firm Name"}`}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     fullWidth

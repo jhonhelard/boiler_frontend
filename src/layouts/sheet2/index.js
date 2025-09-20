@@ -83,6 +83,9 @@ function Sheet2() {
   const [boilerRegisteredChartType, setBoilerRegisteredChartType] = useState('Bar Chart');
   const [economisersManufacturedChartType, setEconomisersManufacturedChartType] = useState('Bar Chart');
   
+  // API Boiler Summary filter state
+  const [selectedServiceType, setSelectedServiceType] = useState('Select All');
+  
   const { isAdmin, userInfo } = useContext(AuthContext);
   
   // Suppress debug console logs while this page is mounted
@@ -111,6 +114,12 @@ function Sheet2() {
   const [EconomiserStatus, setEconomiserStatus] = useState([]);
   const [RunningEconomisers, setRunningEconomisers] = useState([]);
   const [Accident, setAccident] = useState([]);
+  const [ApiBoilerSummaryData, setApiBoilerSummaryData] = useState([]);
+
+  
+  
+  
+  
   // Reset initialization state when component mounts
   useEffect(() => {
     setIsInitialized(false);
@@ -118,6 +127,7 @@ function Sheet2() {
   }, []);
   
   const sheetData2 = sheetData1 && sheetData1.length > 2 ? sheetData1.slice(2, 10) : [];
+  
 
   // Fetch regions data if not already loaded
   const fetchRegions = async () => {
@@ -326,7 +336,7 @@ function Sheet2() {
   const fetchSheet = async () => {
     setLoading(true);
     try {
-      const data = await SheetService.getSheet1Data();
+      const data = await SheetService.getSheet1Data();      
       dispatch(setSheet1(data[0]));
       setTotalstate(data[1]);
       setPerType(data[2]);
@@ -342,6 +352,7 @@ function Sheet2() {
       setEconomiserStatus(data[12]);
       setRunningEconomisers(data[13]);
       setAccident(data[14]);
+      setApiBoilerSummaryData(data[15]);      
     } catch (err) {
       console.error("Error fetching sheet data:", err);
       dispatch(setSheet1([]));
@@ -358,7 +369,8 @@ function Sheet2() {
       setPerVarious([]);
       setEconomiserStatus([]);
       setRunningEconomisers([]);
-      setAccident([]);
+      setAccident([]); 
+      setApiBoilerSummaryData([]);
       notification.error({
         message: "Error",
         description: "Failed to fetch sheet data. Please try again later.",
@@ -386,7 +398,9 @@ function Sheet2() {
         setPerVarious(response.data[12]);
         setEconomiserStatus(response.data[13]);
         setRunningEconomisers(response.data[14]);
-        setAccident(response.data[15]);
+        setAccident(response.data[15]);    
+        setApiBoilerSummaryData(response.data[16]);      
+
         notification.success({
           message: 'Data Refreshed Successfully!',
           description: 'Google Sheets data has been updated and synchronized.',
@@ -522,8 +536,8 @@ function Sheet2() {
         }
 
         return {
-          labels,
-          datasets
+          labels: labels || [],
+          datasets: datasets || []
         };
       } else {
         // Admin sees region-specific data when a specific region is selected
@@ -628,6 +642,17 @@ function Sheet2() {
       };
     }
   }, [sheetData2, isAdmin, selectedCity]);
+
+  // Ensure data always has the correct structure
+  const safeData = useMemo(() => {
+    if (!data || !data.datasets || !Array.isArray(data.datasets)) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+    return data;
+  }, [data]);
 
   // Create reusable function for bar chart data generation
   const createBarChartData = useMemo(() => {
@@ -838,11 +863,11 @@ function Sheet2() {
       }
 
       // Define colors for pie chart segments (using theme color names)
-      const backgroundColors = [
-        "info", "success", "error", "warning", "primary", "secondary",
-        "light", "dark", "info", "success", "error", "warning",
-        "primary", "secondary", "light", "dark", "info", "success",
-        "error", "warning", "primary", "secondary", "light", "dark"
+  const backgroundColors = [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+        "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+        "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+        "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
       ];
 
       return {
@@ -854,7 +879,7 @@ function Sheet2() {
         }
       };
     };
-  }, [sheetData2, selectedCity]);
+  }, [sheetData2, selectedCity]);  
 
   // Create pie chart data for selected city (Boiler as per type by region)
   const pieChartData = useMemo(() => {
@@ -896,10 +921,10 @@ function Sheet2() {
 
     // Define colors for pie chart segments
     const backgroundColors = [
-      "info", "success", "error", "warning", "primary", "secondary",
-      "light", "dark", "info", "success", "error", "warning",
-      "primary", "secondary", "light", "dark", "info", "success",
-      "error", "warning", "primary", "secondary", "light", "dark"
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+        "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+        "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+        "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
     ];
 
     return {
@@ -919,10 +944,112 @@ function Sheet2() {
     return processPieChartData(perType, selectedCity);
   }, [perType, selectedCity]);
 
+  // Process perType data for Maharashtra total (by region totals)
+  const maharashtraTotalPieChartData = useMemo(() => {
+    if (!perType || perType.length === 0) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract region names and their totals from the last column
+    const regionLabels = [];
+    const regionTotals = [];
+    
+    // Process each region row (skip header row and any total row)
+    for (let i = 1; i < perType.length; i++) {
+      const row = perType[i];
+      if (row && row[0] && row[0].trim() !== '') {
+        const regionName = row[0];
+        
+        // Skip if this is a total row (check for common total indicators)
+        if (regionName.toLowerCase().includes('total') || 
+            regionName.toLowerCase().includes('sum') ||
+            regionName.toLowerCase().includes('grand')) {
+          continue;
+        }
+        
+        // Get the total from the last column of each row
+        const totalValue = parseInt(row[row.length - 1]) || 0;
+        
+        if (totalValue > 0) {
+          regionLabels.push(regionName);
+          regionTotals.push(totalValue);
+        }
+      }
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+      "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+      "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+      "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
+    ];
+
+    return {
+      labels: regionLabels,
+      datasets: {
+        label: "Maharashtra Total by Region",
+        data: regionTotals,
+        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+      }
+    };
+  }, [perType]);
+
   // Process perFuelUsed data for pie chart display
   const perFuelUsedPieChartData = useMemo(() => {
     return processPieChartData(perFuelUsed, selectedCity);
   }, [perFuelUsed, selectedCity]);
+
+  // Process perFuelUsed data for Maharashtra total (by region totals)
+  const maharashtraFuelTotalPieChartData = useMemo(() => {
+    if (!perFuelUsed || perFuelUsed.length === 0) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract region names and their totals from the last column
+    const regionLabels = [];
+    const regionTotals = [];
+    
+    // Process each region row (skip header row and any total row)
+    for (let i = 1; i < perFuelUsed.length; i++) {
+      const row = perFuelUsed[i];
+      if (row && row[0] && row[0].trim() !== '') {
+        const regionName = row[0];
+        
+        // Skip if this is a total row (check for common total indicators)
+        if (regionName.toLowerCase().includes('total') || 
+            regionName.toLowerCase().includes('sum') ||
+            regionName.toLowerCase().includes('grand')) {
+          continue;
+        }
+        
+        // Get the total from the last column of each row
+        const totalValue = parseInt(row[row.length - 1]) || 0;
+        
+        if (totalValue > 0) {
+          regionLabels.push(regionName);
+          regionTotals.push(totalValue);
+        }
+      }
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+      "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+      "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+      "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
+    ];
+
+    return {
+      labels: regionLabels,
+      datasets: {
+        label: "Maharashtra Total by Region",
+        data: regionTotals,
+        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+      }
+    };
+  }, [perFuelUsed]);
 
   
 
@@ -931,10 +1058,96 @@ function Sheet2() {
     return processBarChartData(perCapacity, selectedCity);
   }, [perCapacity, selectedCity]);
 
+  // Process perCapacity data for Maharashtra total (by region totals)
+  const maharashtraCapacityTotalBarChartData = useMemo(() => {
+    if (!perCapacity || perCapacity.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+    
+    // Extract region names and their totals from the last column
+    const regionLabels = [];
+    const regionTotals = [];
+    
+    // Process each region row (skip header row and any total row)
+    for (let i = 1; i < perCapacity.length; i++) {
+      const row = perCapacity[i];
+      if (row && row[0] && row[0].trim() !== '') {
+        const regionName = row[0];
+        
+        // Skip if this is a total row (check for common total indicators)
+        if (regionName.toLowerCase().includes('total') || 
+            regionName.toLowerCase().includes('sum') ||
+            regionName.toLowerCase().includes('grand')) {
+          continue;
+        }
+        
+        // Get the total from the last column of each row
+        const totalValue = parseInt(row[row.length - 1]) || 0;
+        
+        if (totalValue > 0) {
+          regionLabels.push(regionName);
+          regionTotals.push(totalValue);
+        }
+      }
+    }
+
+    return {
+      labels: regionLabels,
+      datasets: [{
+        label: "Maharashtra Total by Region",
+        data: regionTotals,
+        color: "warning"
+      }]
+    };
+  }, [perCapacity]);
+
   // Process certificates data for bar chart display
   const certificateDataBarChart = useMemo(() => {
     return processBarChartData(certificate, selectedCity);
   }, [certificate, selectedCity]);
+
+  // Process certificates data for Maharashtra total (by region totals)
+  const maharashtraCertificateTotalBarChartData = useMemo(() => {
+    if (!certificate || certificate.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+    
+    // Extract region names and their totals from the last column
+    const regionLabels = [];
+    const regionTotals = [];
+    
+    // Process each region row (skip header row and any total row)
+    for (let i = 1; i < certificate.length; i++) {
+      const row = certificate[i];
+      if (row && row[0] && row[0].trim() !== '') {
+        const regionName = row[0];
+        
+        // Skip if this is a total row (check for common total indicators)
+        if (regionName.toLowerCase().includes('total') || 
+            regionName.toLowerCase().includes('sum') ||
+            regionName.toLowerCase().includes('grand')) {
+          continue;
+        }
+        
+        // Get the total from the last column of each row
+        const totalValue = parseInt(row[row.length - 1]) || 0;
+        
+        if (totalValue > 0) {
+          regionLabels.push(regionName);
+          regionTotals.push(totalValue);
+        }
+      }
+    }
+
+    return {
+      labels: regionLabels,
+      datasets: [{
+        label: "Maharashtra Total by Region",
+        data: regionTotals,
+        color: "error"
+      }]
+    };
+  }, [certificate]);
 
   // Process BoilerRegistered data for bar chart display (Year-wise data for all regions)
   const boilerRegisteredBarChartData = useMemo(() => {
@@ -1237,10 +1450,10 @@ function Sheet2() {
 
     // Define colors for pie chart segments
     const backgroundColors = [
-      "info", "success", "error", "warning", "primary", "secondary",
-      "light", "dark", "info", "success", "error", "warning",
-      "primary", "secondary", "light", "dark", "info", "success",
-      "error", "warning", "primary", "secondary", "light", "dark"
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+        "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+        "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+        "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
     ];
 
     return {
@@ -1316,6 +1529,57 @@ function Sheet2() {
   const variousIndustriesPieChartData = useMemo(() => {
     return processPieChartData(variousIndustries, selectedCity);
   }, [variousIndustries, selectedCity]);
+
+  // Process variousIndustries data for Maharashtra total (by region totals)
+  const maharashtraIndustriesTotalPieChartData = useMemo(() => {
+    if (!variousIndustries || variousIndustries.length === 0) {
+      return { labels: [], datasets: {} };
+    }
+    
+    // Extract region names and their totals from the last column
+    const regionLabels = [];
+    const regionTotals = [];
+    
+    // Process each region row (skip header row and any total row)
+    for (let i = 1; i < variousIndustries.length; i++) {
+      const row = variousIndustries[i];
+      if (row && row[0] && row[0].trim() !== '') {
+        const regionName = row[0];
+        
+        // Skip if this is a total row (check for common total indicators)
+        if (regionName.toLowerCase().includes('total') || 
+            regionName.toLowerCase().includes('sum') ||
+            regionName.toLowerCase().includes('grand')) {
+          continue;
+        }
+        
+        // Get the total from the last column of each row
+        const totalValue = parseInt(row[row.length - 1]) || 0;
+        
+        if (totalValue > 0) {
+          regionLabels.push(regionName);
+          regionTotals.push(totalValue);
+        }
+      }
+    }
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+      "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+      "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+      "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
+    ];
+
+    return {
+      labels: regionLabels,
+      datasets: {
+        label: "Maharashtra Total by Region",
+        data: regionTotals,
+        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+      }
+    };
+  }, [variousIndustries]);
 
   const HeatingSurfacePieChartData = useMemo(() => {
     return processPieChartData(HeatingSurface, selectedCity);
@@ -1410,13 +1674,114 @@ function Sheet2() {
     };
   }, [isMobile, darkMode]);
 
-  
+  // Create table data from API boiler summary data
+  const createApiBoilerSummaryTableData = useMemo(() => {
+    return () => {
+      if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData) || ApiBoilerSummaryData.length === 0) {
+        return { columns: [], rows: [] };
+      }
+
+      // Define columns based on the API response structure
+      const columns = [
+        {
+          Header: "SERVICE TYPE",
+          accessor: "serviceType",
+          minWidth: isMobile ? 150 : isTablet ? 200 : 250,
+          maxWidth: isMobile ? 250 : isTablet ? 300 : 350,
+        },
+        {
+          Header: "TOTAL APPLICATIONS",
+          accessor: "totalApplications",
+          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
+          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
+        },
+        {
+          Header: "TOTAL DISPOSED",
+          accessor: "totalDisposed",
+          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
+          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
+        },
+        {
+          Header: "PENDING",
+          accessor: "pending",
+          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
+          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
+        },
+        {
+          Header: "APPROVED",
+          accessor: "approved",
+          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
+          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
+        },
+        {
+          Header: "REJECTED",
+          accessor: "rejected",
+          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
+          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
+        },
+        {
+          Header: "DELIVERED ON TIME",
+          accessor: "deliveredOnTime",
+          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
+          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
+        },
+        {
+          Header: "NOT DELIVERED ON TIME",
+          accessor: "notDeliveredOnTime",
+          minWidth: isMobile ? 140 : isTablet ? 170 : 200,
+          maxWidth: isMobile ? 170 : isTablet ? 200 : 220,
+        },
+      ];
+
+      // Process the API data into table rows
+      let rows = ApiBoilerSummaryData.map((item) => ({
+        serviceType: item.serviceType || 'N/A',
+        totalApplications: item["Total Applications Received 2024-2025"] || item["total Application Received 2024-2025"] || 0,
+        totalDisposed: item.total_Disposed || 0,
+        pending: item.pending || 0,
+        approved: item.approved || 0,
+        rejected: item.rejected || 0,
+        deliveredOnTime: item["is Delivered on time"] || item["is Delivered ontime"] || 0,
+        notDeliveredOnTime: item["is NOT Delivered on time"] || item["is NOT Delivered ontime"] || 0,
+      }));
+
+      // Filter rows based on selected service type
+      if (selectedServiceType !== 'Select All') {
+        rows = rows.filter(row => row.serviceType === selectedServiceType);
+      }
+
+      return { columns, rows };
+    };
+  }, [ApiBoilerSummaryData, selectedServiceType, isMobile, darkMode]);
 
   // Create table data from regionalData for the chart
   const regionalTableData = createTableDataFromChart(regionalData, "Regional Data");
   // Create table data for pie charts
   const pieChartTableData = createTableDataFromChart(perTypePieChartData, "Boiler Type Data");
+  const maharashtraTotalTableData = createTableDataFromChart(maharashtraTotalPieChartData, "Maharashtra Total by Region Data");
+  const maharashtraFuelTotalTableData = createTableDataFromChart(maharashtraFuelTotalPieChartData, "Maharashtra Fuel Total by Region Data");
+  const maharashtraCapacityTotalTableData = createTableDataFromChart(maharashtraCapacityTotalBarChartData, "Maharashtra Capacity Total by Region Data");
+  const maharashtraCertificateTotalTableData = createTableDataFromChart(maharashtraCertificateTotalBarChartData, "Maharashtra Certificate Total by Region Data");
+  const maharashtraIndustriesTotalTableData = createTableDataFromChart(maharashtraIndustriesTotalPieChartData, "Maharashtra Industries Total by Region Data");
   const perFuelUsedTableData = createTableDataFromChart(perFuelUsedPieChartData, "Fuel Type Data");
+  const apiBoilerSummaryTableData = createApiBoilerSummaryTableData();
+  
+  // Generate dropdown options for service type filter
+  const serviceTypeOptions = useMemo(() => {
+    if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData) || ApiBoilerSummaryData.length === 0) {
+      return ['Select All'];
+    }
+    
+    const options = ['Select All'];
+    ApiBoilerSummaryData.forEach((item) => {
+      if (item.serviceType && !options.includes(item.serviceType)) {
+        options.push(item.serviceType);
+      }
+    });
+    
+    return options;
+  }, [ApiBoilerSummaryData]);
+  
   const variousIndustriesTableData = createTableDataFromChart(variousIndustriesPieChartData, "Various Industries Data");
   const HeatingSurfaceTableData = createTableDataFromChart(HeatingSurfacePieChartData, "Heating Surface Data");
   
@@ -1597,44 +1962,7 @@ function Sheet2() {
         <Grid container spacing={isMobile ? 2 : 6}>
           <Grid item xs={12}>
             <Card>
-              <MDBox
-                mx={isMobile ? 1 : 2}
-                mt={isMobile ? -2 : -3}
-                py={isMobile ? 2 : 3}
-                px={isMobile ? 1 : 2}
-                variant="gradient"
-                bgColor="info"
-                borderRadius="lg"
-                coloredShadow="info"
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                  Boiler Statistics
-                </MDTypography>
-
-                {isAdmin && (
-                  <MDButton
-                      variant="gradient"
-                      color="success"
-                      size={isMobile ? "small" : "medium"}
-                      onClick={refreshData}
-                      disabled={refreshing}
-                      style={{
-                        fontSize: isMobile ? '10px' : '12px',
-                        padding: isMobile ? '6px 12px' : '8px 16px',
-                        minWidth: isMobile ? '60px' : '80px',
-                      }}
-                    >
-                      {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
-                    </MDButton>
-                )}
-
-              </MDBox>
-              <MDBox pt={isMobile ? 2 : 3}>
+              <MDBox pt={isMobile ? 2 : 3} mb={isAdmin ? 2 : 1}>
                 <MDBox mx={isMobile ? 1 : 2} mb={isMobile ? 2 : 3}>
                   {isAdmin ? (
                     <MDSelect
@@ -1674,7 +2002,45 @@ function Sheet2() {
                     </MDBox>
                   )}
                 </MDBox>
+              </MDBox>
+              <MDBox
+                mx={isMobile ? 1 : 2}
+                mt={isMobile ? -2 : -3}
+                py={isMobile ? 2 : 3}
+                px={isMobile ? 1 : 2}
+                variant="gradient"
+                bgColor="info"
+                borderRadius="lg"
+                coloredShadow="info"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
+                  Boiler Statistics
+                </MDTypography>
 
+                {isAdmin && (
+                  <MDButton
+                      variant="gradient"
+                      color="success"
+                      size={isMobile ? "small" : "medium"}
+                      onClick={refreshData}
+                      disabled={refreshing}
+                      style={{
+                        fontSize: isMobile ? '10px' : '12px',
+                        padding: isMobile ? '6px 12px' : '8px 16px',
+                        minWidth: isMobile ? '60px' : '80px',
+                      }}
+                    >
+                      {refreshing ? "..." : isMobile ? "↻" : "Refresh"}
+                    </MDButton>
+                )}
+
+              </MDBox>
+              <MDBox pt={isMobile ? 2 : 3}>
                 <MDBox
                     mx={isMobile ? 1 : 2}
                     mt={isAdmin ? -2 : -1}
@@ -1690,53 +2056,27 @@ function Sheet2() {
                             // Show 4 specific charts when MAHARASHTRA is selected
                             <>
                               {/* Chart 1: Boiler Statistics by Region */}
-                              <ReportsBarChart
-                                color="info"
-                                title="Boiler Statistics by Region"
-                                description="Boiler Statistics by Region"
-                                date="data updated from Google Sheets"
-                                chart={data}
-                                customOptions={{
-                                  plugins: {
-                                    legend: {
-                                      display: true,
-                                      position: 'right',
-                                      align: 'center',
-                                      labels: {
-                                        usePointStyle: true,
-                                        padding: 20,
-                                        font: {
-                                          size: 12,
-                                          weight: 'bold',
-                                        },
-                                        generateLabels: function(chart) {
-                                          const data = chart.data;
-                                          if (data.labels.length && data.datasets.length) {
-                                            const labels = [];
-                                            data.datasets.forEach((dataset, datasetIndex) => {
-                                              const total = dataset.data.reduce((a, b) => a + b, 0);
-                                              const avg = total / dataset.data.length;
-                                              
-                                              labels.push({
-                                                text: `${dataset.label}`,
-                                                // text: `${dataset.label}: ${total} total (${avg.toFixed(0)} avg)`,
-                                                fillStyle: dataset.backgroundColor || dataset.borderColor,
-                                                strokeStyle: dataset.backgroundColor || dataset.borderColor,
-                                                lineWidth: 0,
-                                                pointStyle: 'rect',
-                                                hidden: false,
-                                                datasetIndex: datasetIndex
-                                              });
-                                            });
-                                            return labels;
-                                          }
-                                          return [];
-                                        }
-                                      }
-                                    }
-                                  }
-                                }}
-                              />
+                              {loading ? (
+                                <MDBox p={3} textAlign="center">
+                                  <MDTypography variant="body2" color="text">
+                                    Loading chart data...
+                                  </MDTypography>
+                                </MDBox>
+                              ) : safeData && safeData.datasets && Array.isArray(safeData.datasets) && safeData.datasets.length > 0 ? (
+                                <ReportsBarChart
+                                  color="info"
+                                  title="Boiler Statistics by Region"
+                                  description="Boiler Statistics by Region"
+                                  date="data updated from Google Sheets"
+                                  chart={safeData}
+                                />
+                              ) : (
+                                <MDBox p={3} textAlign="center">
+                                  <MDTypography variant="body2" color="text">
+                                    No data available for Boiler Statistics by Region
+                                  </MDTypography>
+                                </MDBox>
+                              )}
                               
                               {/* Chart 2: Number of Boiler Registered */}
                               <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
@@ -1753,21 +2093,49 @@ function Sheet2() {
                                       </MDBox>
                                       
                                       {boilerRegisteredChartType === 'Bar Chart' ? (
-                                        <ReportsBarChart
-                                          color="warning"
-                                          title="Number of Boiler Registered"
-                                          description="Number of Boiler Registered"
-                                          date="data updated from Google Sheets"
-                                          chart={boilerRegisteredBarChartData}
-                                        />
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : boilerRegisteredBarChartData && boilerRegisteredBarChartData.datasets && Array.isArray(boilerRegisteredBarChartData.datasets) && boilerRegisteredBarChartData.datasets.length > 0 ? (
+                                          <ReportsBarChart
+                                            color="warning"
+                                            title="Number of Boiler Registered"
+                                            description="Number of Boiler Registered"
+                                            date="data updated from Google Sheets"
+                                            chart={boilerRegisteredBarChartData}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Boiler Registered
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
                                       ) : (
-                                        <PieChart
-                                          color="warning"
-                                          title="Number of Boiler Registered"
-                                          description="Number of Boiler Registered"
-                                          date="data updated from Google Sheets"
-                                          chart={convertBarToPieChartData(boilerRegisteredBarChartData)}
-                                        />
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : boilerRegisteredBarChartData && boilerRegisteredBarChartData.datasets && Array.isArray(boilerRegisteredBarChartData.datasets) && boilerRegisteredBarChartData.datasets.length > 0 ? (
+                                          <PieChart
+                                            color="warning"
+                                            title="Number of Boiler Registered"
+                                            description="Number of Boiler Registered"
+                                            date="data updated from Google Sheets"
+                                            chart={convertBarToPieChartData(boilerRegisteredBarChartData)}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Boiler Registered
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
                                       )}
                                     </MDBox>
                                   </Grid>
@@ -1785,21 +2153,49 @@ function Sheet2() {
                                       </MDBox>
                                       
                                       {economisersManufacturedChartType === 'Bar Chart' ? (
-                                        <ReportsBarChart
-                                          color="error"
-                                          title="Number of Boilers/Economisers Manufactured"
-                                          description="Number of Boilers/Economisers Manufactured"
-                                          date="data updated from Google Sheets"
-                                          chart={economisersBarChartData}
-                                        />
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : economisersBarChartData && economisersBarChartData.datasets && Array.isArray(economisersBarChartData.datasets) && economisersBarChartData.datasets.length > 0 ? (
+                                          <ReportsBarChart
+                                            color="error"
+                                            title="Number of Boilers/Economisers Manufactured"
+                                            description="Number of Boilers/Economisers Manufactured"
+                                            date="data updated from Google Sheets"
+                                            chart={economisersBarChartData}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Economisers Manufactured
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
                                       ) : (
-                                        <PieChart
-                                          color="error"
-                                          title="Number of Boilers/Economisers Manufactured"
-                                          description="Number of Boilers/Economisers Manufactured"
-                                          date="data updated from Google Sheets"
-                                          chart={convertBarToPieChartData(economisersBarChartData)}
-                                        />
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : economisersBarChartData && economisersBarChartData.datasets && Array.isArray(economisersBarChartData.datasets) && economisersBarChartData.datasets.length > 0 ? (
+                                          <PieChart
+                                            color="error"
+                                            title="Number of Boilers/Economisers Manufactured"
+                                            description="Number of Boilers/Economisers Manufactured"
+                                            date="data updated from Google Sheets"
+                                            chart={convertBarToPieChartData(economisersBarChartData)}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Economisers Manufactured
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
                                       )}
                                     </MDBox>
                                   </Grid>
@@ -1816,6 +2212,583 @@ function Sheet2() {
                                   chart={accidentsLineChartData}
                                 />
                               </MDBox>
+                              
+                              {/* Maharashtra Total Boiler Type Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Boiler Type section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="error"
+                                  borderRadius="lg"
+                                  coloredShadow="error"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Running Boiler as per Type
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Boiler Types */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={boilerTypeChartType}
+                                          onChange={(e) => setBoilerTypeChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Pie Chart', 'Bar Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {boilerTypeChartType === 'Pie Chart' ? (
+                                        <PieChart
+                                          color="info"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={maharashtraTotalPieChartData}
+                                        />
+                                      ) : (
+                                        <ReportsBarChart
+                                          color="info"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={convertPieToBarChartData(maharashtraTotalPieChartData)}
+                                        />
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Boiler Type Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-boiler-type-table`}
+                                              table={maharashtraTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
+                              
+                              {/* Maharashtra Total Fuel Type Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Fuel Type section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="success"
+                                  borderRadius="lg"
+                                  coloredShadow="success"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Total Running Boiler as per fuel used
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Fuel Types */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={fuelTypeChartType}
+                                          onChange={(e) => setFuelTypeChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Pie Chart', 'Bar Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {fuelTypeChartType === 'Pie Chart' ? (
+                                        <PieChart
+                                          color="success"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={maharashtraFuelTotalPieChartData}
+                                        />
+                                      ) : (
+                                        <ReportsBarChart
+                                          color="success"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={convertPieToBarChartData(maharashtraFuelTotalPieChartData)}
+                                        />
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Fuel Type Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-fuel-type-table`}
+                                              table={maharashtraFuelTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
+                              
+                              {/* Maharashtra Total Capacity Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Capacity section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="warning"
+                                  borderRadius="lg"
+                                  coloredShadow="warning"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Total Running Boiler as per Capacity in TPH
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Capacity */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={capacityChartType}
+                                          onChange={(e) => setCapacityChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Bar Chart', 'Pie Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {capacityChartType === 'Bar Chart' ? (
+                                        <ReportsBarChart
+                                          color="warning"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={maharashtraCapacityTotalBarChartData}
+                                        />
+                                      ) : (
+                                        <PieChart
+                                          color="warning"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={convertBarToPieChartData(maharashtraCapacityTotalBarChartData)}
+                                        />
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Capacity Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-capacity-table`}
+                                              table={maharashtraCapacityTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
+                              
+                              {/* Maharashtra Total Certificate Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Certificate section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="error"
+                                  borderRadius="lg"
+                                  coloredShadow="error"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Total Boiler as per type of certificate
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Certificate */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={certificateChartType}
+                                          onChange={(e) => setCertificateChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Bar Chart', 'Pie Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {certificateChartType === 'Bar Chart' ? (
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : maharashtraCertificateTotalBarChartData && maharashtraCertificateTotalBarChartData.datasets && Array.isArray(maharashtraCertificateTotalBarChartData.datasets) && maharashtraCertificateTotalBarChartData.datasets.length > 0 ? (
+                                          <ReportsBarChart
+                                            color="warning"
+                                            title=""
+                                            description=""
+                                            date=""
+                                            chart={maharashtraCertificateTotalBarChartData}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Maharashtra Certificate
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
+                                      ) : (
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : maharashtraCertificateTotalBarChartData && maharashtraCertificateTotalBarChartData.datasets && Array.isArray(maharashtraCertificateTotalBarChartData.datasets) && maharashtraCertificateTotalBarChartData.datasets.length > 0 ? (
+                                          <PieChart
+                                            color="warning"
+                                            title=""
+                                            description=""
+                                            date=""
+                                            chart={convertBarToPieChartData(maharashtraCertificateTotalBarChartData)}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Maharashtra Certificate
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Certificate Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-certificate-table`}
+                                              table={maharashtraCertificateTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
+                              
+                              {/* Maharashtra Total Industries Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Industries section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="info"
+                                  borderRadius="lg"
+                                  coloredShadow="info"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Total Boiler used in various industries
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Industries */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={industriesChartType}
+                                          onChange={(e) => setIndustriesChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Pie Chart', 'Bar Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {industriesChartType === 'Pie Chart' ? (
+                                        <PieChart
+                                          color="info"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={maharashtraIndustriesTotalPieChartData}
+                                        />
+                                      ) : (
+                                        loading ? (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              Loading chart data...
+                                            </MDTypography>
+                                          </MDBox>
+                                        ) : maharashtraIndustriesTotalPieChartData && maharashtraIndustriesTotalPieChartData.datasets && maharashtraIndustriesTotalPieChartData.datasets.data && Array.isArray(maharashtraIndustriesTotalPieChartData.datasets.data) && maharashtraIndustriesTotalPieChartData.datasets.data.length > 0 ? (
+                                          <ReportsBarChart
+                                            color="info"
+                                            title=""
+                                            description=""
+                                            date=""
+                                            chart={convertPieToBarChartData(maharashtraIndustriesTotalPieChartData)}
+                                          />
+                                        ) : (
+                                          <MDBox p={3} textAlign="center">
+                                            <MDTypography variant="body2" color="text">
+                                              No data available for Maharashtra Industries
+                                            </MDTypography>
+                                          </MDBox>
+                                        )
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Industries Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-industries-table`}
+                                              table={maharashtraIndustriesTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
                             </>
                           ) : (
                             // Show region-specific charts for other regions (not the 4 Maharashtra charts)
@@ -1830,14 +2803,28 @@ function Sheet2() {
                                       boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                                     }}
                                   >
-                                    <ReportsBarChart
-                                      color="info"
-                                      title={`${selectedCity || 'Region'} Boiler Statistics`}
-                                      description={`Boiler statistics for ${selectedCity || 'selected region'}`}
-                                      date="data updated from Google Sheets"
-                                      chart={data}
-                                      height={isMobile ? "200px" : "250px"}
-                                    />
+                                    {loading ? (
+                                      <MDBox p={3} textAlign="center">
+                                        <MDTypography variant="body2" color="text">
+                                          Loading chart data...
+                                        </MDTypography>
+                                      </MDBox>
+                                    ) : data && data.datasets && Array.isArray(data.datasets) && data.datasets.length > 0 ? (
+                                      <ReportsBarChart
+                                        color="info"
+                                        title={`${selectedCity || 'Region'} Boiler Statistics Distribution`}
+                                        description={`Boiler statistics for ${selectedCity || 'selected region'}`}
+                                        date="data updated from Google Sheets"
+                                        chart={data}
+                                        height={isMobile ? "200px" : "250px"}
+                                      />
+                                    ) : (
+                                      <MDBox p={3} textAlign="center">
+                                        <MDTypography variant="body2" color="text">
+                                          No data available for {selectedCity || 'selected region'}
+                                        </MDTypography>
+                                      </MDBox>
+                                    )}
                                   </MDBox>
                                 </Grid>
                                 <Grid item xs={12} md={6} lg={6}>
@@ -2072,11 +3059,27 @@ function Sheet2() {
                   style={{ display: isMaharashtraSelected ? 'none' : 'block' }}
                 >
                   <MDBox mb={isMobile ? 2 : 3}>
+                    {/* Single Header for the entire section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="error"
+                      borderRadius="lg"
+                      coloredShadow="error"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Running Boiler as per Type
+                      </MDTypography>
+                    </MDBox>
+                    
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
                           {/* Chart Type Selector for Boiler Types */}
-                          <MDBox mb={2} display="flex" justifyContent="flex-end" style={{marginTop: "20px"}}>
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
                             <MDSelect
                               value={boilerTypeChartType}
                               onChange={(e) => setBoilerTypeChartType(e.target.value)}
@@ -2088,19 +3091,33 @@ function Sheet2() {
                           {boilerTypeChartType === 'Pie Chart' ? (
                             <PieChart
                               color="info"
-                              title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
-                              description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
+                              title=""
+                              description=""
+                              date=""
                               chart={pieChartData}
                             />
                           ) : (
-                            <ReportsBarChart
-                              color="info"
-                              title={isMobile ? `${selectedCity || 'Region'} : Boiler Types` : `${selectedCity || 'Region'} : Running Boiler as per Type`}
-                              description={isMobile ? `Type distribution for ${selectedCity || 'selected region'}` : `Boiler types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={convertPieToBarChartData(pieChartData)}
-                            />
+                            loading ? (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  Loading chart data...
+                                </MDTypography>
+                              </MDBox>
+                            ) : pieChartData && pieChartData.datasets && pieChartData.datasets.data && Array.isArray(pieChartData.datasets.data) && pieChartData.datasets.data.length > 0 ? (
+                              <ReportsBarChart
+                                color="info"
+                                title=""
+                                description=""
+                                date=""
+                                chart={convertPieToBarChartData(pieChartData)}
+                              />
+                            ) : (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  No data available for Boiler Types
+                                </MDTypography>
+                              </MDBox>
+                            )
                           )}
                         </MDBox>
 
@@ -2109,37 +3126,24 @@ function Sheet2() {
                         {/* Boiler Type Data Table */}
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
                           <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="error"
-                              borderRadius="lg"
-                              coloredShadow="error"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
-                                {selectedCity || 'Region'} Running Boiler as per Type
-                              </MDTypography>
-                            </MDBox>
                             <MDBox pt={isMobile ? 2 : 3}>
                               <div style={{
                                 overflowX: 'auto',
+                                overflowY: 'auto',
                                 maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                               }}>
                                 <DataTable
                                   key={`boiler-type-table-${selectedCity}`}
                                   table={pieChartTableData}
                                   entriesPerPage={false}
                                   canSearch={false}
-                                  showTotalEntries={true}
+                                  showTotalEntries={false}
                                   isLoading={loading}
                                   isSorted={false}
-                                  defaultPageSize={5}
+                                  defaultPageSize={1000}
                                   sx={{
                                     minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                                     fontSize: isMobile ? '12px' : '14px',
                                     '& .MuiTableCell-root': {
                                       padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
@@ -2160,7 +3164,7 @@ function Sheet2() {
                                       fontWeight: '500',
                                     },
                                     '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
+                                      height: '100%',
                                     },
                                   }}
                                 />
@@ -2173,10 +3177,26 @@ function Sheet2() {
                   </MDBox>
 
                   <MDBox mb={isMobile ? 2 : 3}>
+                    {/* Single Header for the entire Fuel Type section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="success"
+                      borderRadius="lg"
+                      coloredShadow="success"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Running Boiler as per fuel used
+                      </MDTypography>
+                    </MDBox>
+                    
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                          <MDBox mb={2} display="flex" justifyContent="flex-end" style={{marginTop: "20px"}}>
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
                             <MDSelect
                               value={fuelTypeChartType}
                               onChange={(e) => setFuelTypeChartType(e.target.value)}
@@ -2188,56 +3208,57 @@ function Sheet2() {
                           {fuelTypeChartType === 'Pie Chart' ? (
                             <PieChart
                               color="success"
-                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
-                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
+                              title=""
+                              description=""
+                              date=""
                               chart={perFuelUsedPieChartData}
                             />
                           ) : (
-                            <ReportsBarChart
-                              color="success"
-                              title={isMobile ? `${selectedCity || 'Region'} : Fuel Types` : `${selectedCity || 'Region'} : Running Boiler as per fuel used`}
-                              description={isMobile ? `Fuel distribution for ${selectedCity || 'selected region'}` : `Boiler fuel types distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={convertPieToBarChartData(perFuelUsedPieChartData)}
-                            />
+                            loading ? (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  Loading chart data...
+                                </MDTypography>
+                              </MDBox>
+                            ) : perFuelUsedPieChartData && perFuelUsedPieChartData.datasets && perFuelUsedPieChartData.datasets.data && Array.isArray(perFuelUsedPieChartData.datasets.data) && perFuelUsedPieChartData.datasets.data.length > 0 ? (
+                              <ReportsBarChart
+                                color="success"
+                                title=""
+                                description=""
+                                date=""
+                                chart={convertPieToBarChartData(perFuelUsedPieChartData)}
+                              />
+                            ) : (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  No data available for Fuel Types
+                                </MDTypography>
+                              </MDBox>
+                            )
                           )}
                         </MDBox>
                       </Grid>
                       <Grid item xs={12} md={6} lg={6}>    
                         <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
                           <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="success"
-                              borderRadius="lg"
-                              coloredShadow="success"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} Running Boiler as per fuel used
-                              </MDTypography>
-                            </MDBox>
                             <MDBox pt={isMobile ? 2 : 3}>
                               <div style={{
                                 overflowX: 'auto',
+                                overflowY: 'auto',
                                 maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                               }}>
                                 <DataTable
                                   key={`fuel-type-table-${selectedCity}`}
                                   table={perFuelUsedTableData}
                                   entriesPerPage={false}
                                   canSearch={false}
-                                  showTotalEntries={true}
+                                  showTotalEntries={false}
                                   isLoading={loading}
                                   isSorted={false}
-                                  defaultPageSize={5}
+                                  defaultPageSize={1000}
                                   sx={{
                                     minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                                     fontSize: isMobile ? '12px' : '14px',
                                     '& .MuiTableCell-root': {
                                       padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
@@ -2258,7 +3279,7 @@ function Sheet2() {
                                       fontWeight: '500',
                                     },
                                     '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
+                                      height: '100%',
                                     },
                                   }}
                                 />
@@ -2270,106 +3291,365 @@ function Sheet2() {
                     </Grid>
                   </MDBox>
 
+                  {/* Capacity Chart Section */}
                   <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
-                      <Grid container spacing={isMobile ? 1 : 3}>
-                        <Grid item xs={12} md={6} lg={6}>
-                          <MDBox mb={isMobile ? 1 : 3}>
-                            {/* Chart Type Selector for Capacity */}
-                            <MDBox mb={2} display="flex" justifyContent="flex-end">
-                              <MDSelect
-                                value={capacityChartType}
-                                onChange={(e) => setCapacityChartType(e.target.value)}
-                                label="Chart Type"
-                                options={['Pie Chart', 'Bar Chart']}
-                              />
-                            </MDBox>
-                            
-                            {capacityChartType === 'Bar Chart' ? (
-                              <ReportsBarChart
-                                color="warning"
-                                title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
-                                description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={perCapacityBarChartData}
-                              />
-                            ) : (
-                              <PieChart
-                                color="warning"
-                                title={`${selectedCity || 'Region'} : Running Boiler as per Capacity in TPH`}
-                                description={`Running Boiler as per Capacity in TPH for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={convertBarToPieChartData(perCapacityBarChartData)}
-                              />
-                            )}
-                          </MDBox>
-                        </Grid>
-                        <Grid item xs={12} md={6} lg={6}>
-                          <MDBox mb={isMobile ? 1 : 3}>
-                            {/* Chart Type Selector for Certificate */}
-                            <MDBox mb={2} display="flex" justifyContent="flex-end">
-                              <MDSelect
-                                value={certificateChartType}
-                                onChange={(e) => setCertificateChartType(e.target.value)}
-                                label="Chart Type"
-                                options={['Pie Chart', 'Bar Chart']}
-                              />
-                            </MDBox>
-                            
-                            {certificateChartType === 'Bar Chart' ? (
-                              <ReportsBarChart
-                                color="error"
-                                title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
-                                description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={certificateDataBarChart}
-                              />
-                            ) : (
-                              <PieChart
-                                color="error"
-                                title={`${selectedCity || 'Region'} : Boiler as per type of certificate`}
-                                description={`Boiler as per type of certificate for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={convertBarToPieChartData(certificateDataBarChart)}
-                              />
-                            )}
-                          </MDBox>
-                        </Grid>
-                      </Grid>
+                    {/* Single Header for the entire Capacity section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="warning"
+                      borderRadius="lg"
+                      coloredShadow="warning"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Running Boiler as per Capacity in TPH
+                      </MDTypography>
                     </MDBox>
-
-                  <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                    
                     <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
-                            {/* Chart Type Selector for District */}
-                            <MDBox mb={2} display="flex" justifyContent="flex-end">
-                              <MDSelect
-                                value={districtChartType}
-                                onChange={(e) => setDistrictChartType(e.target.value)}
-                                label="Chart Type"
-                                options={['Pie Chart', 'Bar Chart']}
-                              />
-                            </MDBox>
-                            
-                            {districtChartType === 'Bar Chart' ? (
+                          {/* Chart Type Selector for Capacity */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={capacityChartType}
+                              onChange={(e) => setCapacityChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {capacityChartType === 'Bar Chart' ? (
+                            loading ? (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  Loading chart data...
+                                </MDTypography>
+                              </MDBox>
+                            ) : perCapacityBarChartData && perCapacityBarChartData.datasets && Array.isArray(perCapacityBarChartData.datasets) && perCapacityBarChartData.datasets.length > 0 ? (
                               <ReportsBarChart
                                 color="warning"
-                                title={`${selectedCity || 'Region'} : Boiler as per various district`}
-                                description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={economiserStatusBarChartData}
+                                title=""
+                                description=""
+                                date=""
+                                chart={perCapacityBarChartData}
                               />
                             ) : (
-                              <PieChart
-                                color="warning"
-                                title={`${selectedCity || 'Region'} : Boiler as per various district`}
-                                description={`Boiler as per various district for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
-                                chart={convertBarToPieChartData(economiserStatusBarChartData)}
-                              />
-                            )}
-                          </MDBox>
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  No data available for Capacity
+                                </MDTypography>
+                              </MDBox>
+                            )
+                          ) : (
+                            <PieChart
+                              color="warning"
+                              title=""
+                              description=""
+                              date=""
+                              chart={convertBarToPieChartData(perCapacityBarChartData)}
+                            />
+                          )}
+                        </MDBox>
                       </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
+                        {/* Capacity Data Table */}
+                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                          <Card>
+                            <MDBox pt={isMobile ? 2 : 3}>
+                              <div style={{
+                                overflowX: 'auto',
+                                overflowY: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                              }}>
+                                <DataTable
+                                  key={`capacity-table-${selectedCity}`}
+                                  table={createTableDataFromChart(perCapacityBarChartData, "Capacity Data")}
+                                  entriesPerPage={false}
+                                  canSearch={false}
+                                  showTotalEntries={false}
+                                  isLoading={loading}
+                                  isSorted={false}
+                                  defaultPageSize={1000}
+                                  sx={{
+                                    minWidth: isMobile ? '100%' : 'auto',
+                                    fontSize: isMobile ? '12px' : '14px',
+                                    '& .MuiTableCell-root': {
+                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                      borderSpacing: isMobile ? '2px' : '4px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableHead-root .MuiTableCell-root': {
+                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: 600,
+                                    },
+                                    '& .MuiTableBody-root .MuiTableCell-root': {
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableContainer-root': {
+                                      height: '100%',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </MDBox>
+                          </Card>
+                        </MDBox>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+
+                  {/* Certificate Chart Section */}
+                  <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                    {/* Single Header for the entire Certificate section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="error"
+                      borderRadius="lg"
+                      coloredShadow="error"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Boiler as per type of certificate
+                      </MDTypography>
+                    </MDBox>
+                    
+                    <Grid container spacing={isMobile ? 1 : 3}>
+                      <Grid item xs={12} md={6} lg={6}>
+                        <MDBox mb={isMobile ? 1 : 3}>
+                          {/* Chart Type Selector for Certificate */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={certificateChartType}
+                              onChange={(e) => setCertificateChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {certificateChartType === 'Bar Chart' ? (
+                            loading ? (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  Loading chart data...
+                                </MDTypography>
+                              </MDBox>
+                            ) : certificateDataBarChart && certificateDataBarChart.datasets && Array.isArray(certificateDataBarChart.datasets) && certificateDataBarChart.datasets.length > 0 ? (
+                              <ReportsBarChart
+                                color="error"
+                                title=""
+                                description=""
+                                date=""
+                                chart={certificateDataBarChart}
+                              />
+                            ) : (
+                              <MDBox p={3} textAlign="center">
+                                <MDTypography variant="body2" color="text">
+                                  No data available for Certificate
+                                </MDTypography>
+                              </MDBox>
+                            )
+                          ) : (
+                            <PieChart
+                              color="error"
+                              title=""
+                              description=""
+                              date=""
+                              chart={convertBarToPieChartData(certificateDataBarChart)}
+                            />
+                          )}
+                        </MDBox>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
+                        {/* Certificate Data Table */}
+                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                          <Card>
+                            <MDBox pt={isMobile ? 2 : 3}>
+                              <div style={{
+                                overflowX: 'auto',
+                                overflowY: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                              }}>
+                                <DataTable
+                                  key={`certificate-table-${selectedCity}`}
+                                  table={createTableDataFromChart(certificateDataBarChart, "Certificate Data")}
+                                  entriesPerPage={false}
+                                  canSearch={false}
+                                  showTotalEntries={false}
+                                  isLoading={loading}
+                                  isSorted={false}
+                                  defaultPageSize={1000}
+                                  sx={{
+                                    minWidth: isMobile ? '100%' : 'auto',
+                                    fontSize: isMobile ? '12px' : '14px',
+                                    '& .MuiTableCell-root': {
+                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                      borderSpacing: isMobile ? '2px' : '4px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableHead-root .MuiTableCell-root': {
+                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: 600,
+                                    },
+                                    '& .MuiTableBody-root .MuiTableCell-root': {
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableContainer-root': {
+                                      height: '100%',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </MDBox>
+                          </Card>
+                        </MDBox>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+
+                  {/* District Chart Section */}
+                  <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                    {/* Single Header for the entire District section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="warning"
+                      borderRadius="lg"
+                      coloredShadow="warning"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Boiler as per various district
+                      </MDTypography>
+                    </MDBox>
+                    
+                    <Grid container spacing={isMobile ? 1 : 3}>
+                      <Grid item xs={12} md={6} lg={6}>
+                        <MDBox mb={isMobile ? 1 : 3}>
+                          {/* Chart Type Selector for District */}
+                          <MDBox mb={2} display="flex" justifyContent="flex-end">
+                            <MDSelect
+                              value={districtChartType}
+                              onChange={(e) => setDistrictChartType(e.target.value)}
+                              label="Chart Type"
+                              options={['Pie Chart', 'Bar Chart']}
+                            />
+                          </MDBox>
+                          
+                          {districtChartType === 'Bar Chart' ? (
+                            <ReportsBarChart
+                              color="warning"
+                              title=""
+                              description=""
+                              date=""
+                              chart={economiserStatusBarChartData}
+                            />
+                          ) : (
+                            <PieChart
+                              color="warning"
+                              title=""
+                              description=""
+                              date=""
+                              chart={convertBarToPieChartData(economiserStatusBarChartData)}
+                            />
+                          )}
+                        </MDBox>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
+                        {/* District Data Table */}
+                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                          <Card>
+                            <MDBox pt={isMobile ? 2 : 3}>
+                              <div style={{
+                                overflowX: 'auto',
+                                overflowY: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                              }}>
+                                <DataTable
+                                  key={`district-table-${selectedCity}`}
+                                  table={createTableDataFromChart(economiserStatusBarChartData, "District Data")}
+                                  entriesPerPage={false}
+                                  canSearch={false}
+                                  showTotalEntries={false}
+                                  isLoading={loading}
+                                  isSorted={false}
+                                  defaultPageSize={1000}
+                                  sx={{
+                                    minWidth: isMobile ? '100%' : 'auto',
+                                    fontSize: isMobile ? '12px' : '14px',
+                                    '& .MuiTableCell-root': {
+                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                      borderSpacing: isMobile ? '2px' : '4px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableHead-root .MuiTableCell-root': {
+                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: 600,
+                                    },
+                                    '& .MuiTableBody-root .MuiTableCell-root': {
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableContainer-root': {
+                                      height: '100%',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </MDBox>
+                          </Card>
+                        </MDBox>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+
+                  {/* Heating Surface Chart Section */}
+                  <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                    {/* Single Header for the entire Heating Surface section */}
+                    <MDBox
+                      mx={isMobile ? 1 : 2}
+                      mb={2}
+                      py={isMobile ? 2 : 3}
+                      px={isMobile ? 1 : 2}
+                      variant="gradient"
+                      bgColor="primary"
+                      borderRadius="lg"
+                      coloredShadow="primary"
+                    >
+                      <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                        {selectedCity || 'Region'} Boiler as per Heating surface in m2
+                      </MDTypography>
+                    </MDBox>
+                    
+                    <Grid container spacing={isMobile ? 1 : 3}>
                       <Grid item xs={12} md={6} lg={6}>
                         <MDBox mb={isMobile ? 1 : 3}>
                           {/* Chart Type Selector for Heating Surface */}
@@ -2385,20 +3665,71 @@ function Sheet2() {
                           {heatingSurfaceChartType === 'Pie Chart' ? (
                             <PieChart
                               color="primary"
-                              title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
-                              description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
+                              title=""
+                              description=""
+                              date=""
                               chart={HeatingSurfacePieChartData}
                             />
                           ) : (
                             <ReportsBarChart
                               color="primary"
-                              title={isMobile ? `${selectedCity || 'Region'} : Heating Surface` : `${selectedCity || 'Region'} : Boiler as per Heating surface in m2`}
-                              description={isMobile ? `Heating surface for ${selectedCity || 'selected region'}` : `Boiler heating surface distribution for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
+                              title=""
+                              description=""
+                              date=""
                               chart={convertPieToBarChartData(HeatingSurfacePieChartData)}
                             />
                           )}
+                        </MDBox>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={6}>
+                        {/* Heating Surface Data Table */}
+                        <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                          <Card>
+                            <MDBox pt={isMobile ? 2 : 3}>
+                              <div style={{
+                                overflowX: 'auto',
+                                overflowY: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                              }}>
+                                <DataTable
+                                  key={`heating-surface-table-${selectedCity}`}
+                                  table={createTableDataFromChart(HeatingSurfacePieChartData, "Heating Surface Data")}
+                                  entriesPerPage={false}
+                                  canSearch={false}
+                                  showTotalEntries={false}
+                                  isLoading={loading}
+                                  isSorted={false}
+                                  defaultPageSize={1000}
+                                  sx={{
+                                    minWidth: isMobile ? '100%' : 'auto',
+                                    fontSize: isMobile ? '12px' : '14px',
+                                    '& .MuiTableCell-root': {
+                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                      borderSpacing: isMobile ? '2px' : '4px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableHead-root .MuiTableCell-root': {
+                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: 600,
+                                    },
+                                    '& .MuiTableBody-root .MuiTableCell-root': {
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      color: darkMode ? '#ffffff' : '#000000',
+                                      fontWeight: '500',
+                                    },
+                                    '& .MuiTableContainer-root': {
+                                      height: '100%',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </MDBox>
+                          </Card>
                         </MDBox>
                       </Grid>
                     </Grid>
@@ -2425,20 +3756,21 @@ function Sheet2() {
                             <MDBox pt={isMobile ? 2 : 3}>
                               <div style={{
                                 overflowX: 'auto',
+                                overflowY: 'auto',
                                 maxWidth: '100%',
+                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                               }}>
                                 <DataTable
                                   key={`district-table-${selectedCity}`}
                                   table={perVariousTableData}
                                   entriesPerPage={false}
                                   canSearch={false}
-                                  showTotalEntries={true}
+                                  showTotalEntries={false}
                                   isLoading={loading}
                                   isSorted={false}
-                                  defaultPageSize={5}
+                                  defaultPageSize={1000}
                                   sx={{
                                     minWidth: isMobile ? '100%' : 'auto',
-                                    minHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                                     fontSize: isMobile ? '12px' : '14px',
                                     '& .MuiTableCell-root': {
                                       padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
@@ -2459,7 +3791,7 @@ function Sheet2() {
                                       fontWeight: '500',
                                     },
                                     '& .MuiTableContainer-root': {
-                                      minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
+                                      height: '100%',
                                     },
                                   }}
                                 />
@@ -2470,40 +3802,133 @@ function Sheet2() {
                       </Grid>
                     </MDBox>
 
+                    {/* Industries Chart Section */}
                     <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                      {/* Single Header for the entire Industries section */}
+                      <MDBox
+                        mx={isMobile ? 1 : 2}
+                        mb={2}
+                        py={isMobile ? 2 : 3}
+                        px={isMobile ? 1 : 2}
+                        variant="gradient"
+                        bgColor="warning"
+                        borderRadius="lg"
+                        coloredShadow="warning"
+                      >
+                        <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                          {selectedCity || 'Region'} Boiler used in various industries
+                        </MDTypography>
+                      </MDBox>
+                      
                       <Grid container spacing={isMobile ? 1 : 3}>
                         <Grid item xs={12} md={6} lg={6}>
-                        <MDBox mb={isMobile ? 1 : 3}>
-                          {/* Chart Type Selector for Industries */}
-                          <MDBox mb={2} display="flex" justifyContent="flex-end">
-                            <MDSelect
-                              value={industriesChartType}
-                              onChange={(e) => setIndustriesChartType(e.target.value)}
-                              label="Chart Type"
-                              options={['Pie Chart', 'Bar Chart']}
-                            />
-                          </MDBox>
-                          
-                                                      {industriesChartType === 'Pie Chart' ? (
+                          <MDBox mb={isMobile ? 1 : 3}>
+                            {/* Chart Type Selector for Industries */}
+                            <MDBox mb={2} display="flex" justifyContent="flex-end">
+                              <MDSelect
+                                value={industriesChartType}
+                                onChange={(e) => setIndustriesChartType(e.target.value)}
+                                label="Chart Type"
+                                options={['Pie Chart', 'Bar Chart']}
+                              />
+                            </MDBox>
+                            
+                            {industriesChartType === 'Pie Chart' ? (
                               <PieChart
-                              color="warning"
-                              title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
-                              description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={variousIndustriesPieChartData}
-                            />
+                                color="warning"
+                                title=""
+                                description=""
+                                date=""
+                                chart={variousIndustriesPieChartData}
+                              />
                             ) : (
-                            <ReportsBarChart
-                              color="warning"
-                              title={isMobile ? `${selectedCity || 'Region'} : Industries` : `${selectedCity || 'Region'} : Boiler used in various industries`}
-                              description={isMobile ? `Industry distribution for ${selectedCity || 'selected region'}` : `Boiler usage across various industries for ${selectedCity || 'selected region'}`}
-                              date="data updated from Google Sheets"
-                              chart={convertPieToBarChartData(variousIndustriesPieChartData)}
-                            />
-                          )}
-                        </MDBox>
-
+                              <ReportsBarChart
+                                color="warning"
+                                title=""
+                                description=""
+                                date=""
+                                chart={convertPieToBarChartData(variousIndustriesPieChartData)}
+                              />
+                            )}
+                          </MDBox>
                         </Grid>
+                        <Grid item xs={12} md={6} lg={6}>
+                          {/* Industries Data Table */}
+                          <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                            <Card>
+                              <MDBox pt={isMobile ? 2 : 3}>
+                                <div style={{
+                                  overflowX: 'auto',
+                                  overflowY: 'auto',
+                                  maxWidth: '100%',
+                                  maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                }}>
+                                  <DataTable
+                                    key={`industries-table-${selectedCity}`}
+                                    table={createTableDataFromChart(variousIndustriesPieChartData, "Industries Data")}
+                                    entriesPerPage={false}
+                                    canSearch={false}
+                                    showTotalEntries={false}
+                                    isLoading={loading}
+                                    isSorted={false}
+                                    defaultPageSize={1000}
+                                    sx={{
+                                      minWidth: isMobile ? '100%' : 'auto',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      '& .MuiTableCell-root': {
+                                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                        borderSpacing: isMobile ? '2px' : '4px',
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: '500',
+                                      },
+                                      '& .MuiTableHead-root .MuiTableCell-root': {
+                                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: 600,
+                                      },
+                                      '& .MuiTableBody-root .MuiTableCell-root': {
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: '500',
+                                      },
+                                      '& .MuiTableContainer-root': {
+                                        height: '100%',
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                      },
+                                    }}
+                                  />
+                                </div>
+                              </MDBox>
+                            </Card>
+                          </MDBox>
+                        </Grid>
+                      </Grid>
+                    </MDBox>
+
+                    {/* Economisers Chart Section */}
+                    <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                      {/* Single Header for the entire Economisers section */}
+                      <MDBox
+                        mx={isMobile ? 1 : 2}
+                        mb={2}
+                        py={isMobile ? 2 : 3}
+                        px={isMobile ? 1 : 2}
+                        variant="gradient"
+                        bgColor="success"
+                        borderRadius="lg"
+                        coloredShadow="success"
+                      >
+                        <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                          {selectedCity || 'Region'} Running Economisers Used in Various Industries
+                        </MDTypography>
+                      </MDBox>
+                      
+                      <Grid container spacing={isMobile ? 1 : 3}>
                         <Grid item xs={12} md={6} lg={6}>
                           <MDBox mb={isMobile ? 1 : 3}>
                             {/* Chart Type Selector for Economisers */}
@@ -2519,9 +3944,9 @@ function Sheet2() {
                             {economisersChartType === 'Pie Chart' ? (
                               <PieChart
                                 color="success"
-                                title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
-                                description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
+                                title=""
+                                description=""
+                                date=""
                                 chart={runningEconomisersPieChartData}
                                 customOptions={{
                                   plugins: {
@@ -2565,12 +3990,62 @@ function Sheet2() {
                             ) : (
                               <ReportsBarChart
                                 color="success"
-                                title={`${selectedCity || 'Region'} : Running Economisers Used in Various Industries`}
-                                description={`Industry-wise distribution of running economisers for ${selectedCity || 'selected region'}`}
-                                date="data updated from Google Sheets"
+                                title=""
+                                description=""
+                                date=""
                                 chart={convertPieToBarChartData(runningEconomisersPieChartData)}
                               />
                             )}
+                          </MDBox>
+                        </Grid>
+                        <Grid item xs={12} md={6} lg={6}>
+                          {/* Economisers Data Table */}
+                          <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                            <Card>
+                              <MDBox pt={isMobile ? 2 : 3}>
+                                <div style={{
+                                   overflowX: 'auto',
+                                   maxWidth: '100%',
+                                   maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                }}>
+                                  <DataTable
+                                    key={`economisers-table-${selectedCity}`}
+                                    table={createTableDataFromChart(runningEconomisersPieChartData, "Economisers Data")}
+                                    entriesPerPage={false}
+                                    canSearch={false}
+                                    showTotalEntries={false}
+                                    isLoading={loading}
+                                    isSorted={false}
+                                    defaultPageSize={1000}
+                                    sx={{
+                                      minWidth: isMobile ? '100%' : 'auto',
+                                      fontSize: isMobile ? '12px' : '14px',
+                                      '& .MuiTableCell-root': {
+                                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                        borderSpacing: isMobile ? '2px' : '4px',
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: '500',
+                                      },
+                                      '& .MuiTableHead-root .MuiTableCell-root': {
+                                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: 600,
+                                      },
+                                      '& .MuiTableBody-root .MuiTableCell-root': {
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        color: darkMode ? '#ffffff' : '#000000',
+                                        fontWeight: '500',
+                                      },
+                                      '& .MuiTableContainer-root': {
+                                        minHeight: isMobile ? '250px' : isTablet ? '300px' : '350px',
+                                      },
+                                    }}
+                                  />
+                                </div>
+                              </MDBox>
+                            </Card>
                           </MDBox>
                         </Grid>
                       </Grid>
@@ -2680,6 +4155,111 @@ function Sheet2() {
           </Grid>
         </Grid>
       </MDBox>
+
+      {/* API Boiler Summary Data Section */}
+      <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
+        <Grid container spacing={isMobile ? 2 : 6}>
+          <Grid item xs={12}>
+            <Card>
+              <MDBox
+                mx={isMobile ? 1 : 2}
+                mt={isMobile ? -2 : -3}
+                py={isMobile ? 2 : 3}
+                px={isMobile ? 1 : 2}
+                variant="gradient"
+                bgColor="primary"
+                borderRadius="lg"
+                coloredShadow="primary"
+              >
+                <MDBox display="flex" justifyContent="space-between" alignItems="center">
+                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
+                    Boiler Summary Data (2024-2025)
+                  </MDTypography>
+                  <MDBox display="flex" alignItems="center" gap={2}>
+                    <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '12px' : '14px' }}>
+                      Filter by Service Type:
+                    </MDTypography>
+                    <MDSelect
+                      value={selectedServiceType}
+                      onChange={(e) => setSelectedServiceType(e.target.value)}
+                      label=""
+                      // label="Service Type"
+                      options={serviceTypeOptions}
+                      sx={{
+                        minWidth: isMobile ? '150px' : '200px',
+                        '& .MuiSelect-select': {
+                          color: 'white',
+                          fontSize: isMobile ? '12px' : '14px',
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.5)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'white',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'white',
+                        },
+                        '& .MuiSvgIcon-root': {
+                          color: 'white',
+                        },
+                      }}
+                    />
+                  </MDBox>
+                </MDBox>
+              </MDBox>
+              <MDBox pt={isMobile ? 2 : 3}>
+                <div style={{
+                  overflowX: 'auto',
+                  overflowY: 'auto',
+                  maxWidth: '100%',
+                  maxHeight: isMobile ? '400px' : isTablet ? '500px' : '600px',
+                  borderRadius: '8px',
+                }}>
+                  <DataTable
+                    key={`api-boiler-summary-table`}
+                    table={apiBoilerSummaryTableData}
+                    entriesPerPage={false}
+                    canSearch={false}
+                    showTotalEntries={false}
+                    isLoading={loading}
+                    isSorted={false}
+                    defaultPageSize={1000}
+                    sx={{
+                      minWidth: isMobile ? '100%' : 'auto',
+                      fontSize: isMobile ? '12px' : '14px',
+                      '& .MuiTableCell-root': {
+                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                        borderSpacing: isMobile ? '2px' : '4px',
+                        fontSize: isMobile ? '12px' : '14px',
+                        color: darkMode ? '#ffffff' : '#000000',
+                        fontWeight: '500',
+                      },
+                      '& .MuiTableHead-root .MuiTableCell-root': {
+                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                        fontSize: isMobile ? '12px' : '14px',
+                        color: darkMode ? '#ffffff' : '#000000',
+                        fontWeight: 600,
+                      },
+                      '& .MuiTableBody-root .MuiTableCell-root': {
+                        fontSize: isMobile ? '12px' : '14px',
+                        color: darkMode ? '#ffffff' : '#000000',
+                        fontWeight: '500',
+                      },
+                      '& .MuiTableContainer-root': {
+                        height: '100%',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                      },
+                    }}
+                  />
+                </div>
+              </MDBox>
+            </Card>
+          </Grid>
+        </Grid>
+      </MDBox>
+
       <Footer />
     </DashboardLayout>
   );
