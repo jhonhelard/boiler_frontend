@@ -29,12 +29,7 @@ const baseRoutes = [
     component: <Sheet1 />,
   },
   {
-    type: "collapse",
-    name: "Service Type",
-    key: "tables/service-type",
-    icon: <Icon fontSize="small">category</Icon>,
-    route: "/tables/service-type",
-    component: <ServiceType />,
+    // Service Type moved to admin-only section below
   },
   {
     type: "collapse",
@@ -47,6 +42,15 @@ const baseRoutes = [
 
 // Admin-only routes
 const adminRoutes = [
+  {
+    type: "collapse",
+    name: "Service Type",
+    key: "tables/service-type",
+    icon: <Icon fontSize="small">category</Icon>,
+    route: "/tables/service-type",
+    component: <ServiceType />,
+    adminOnly: true,
+  },
   {
     type: "collapse",
     name: "User table",

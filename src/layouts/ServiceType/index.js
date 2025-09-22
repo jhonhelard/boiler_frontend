@@ -54,6 +54,8 @@ function ServiceType() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [userHasSelected, setUserHasSelected] = useState(false);
+  // Only show sequential notifications once on initial load
+  const [hasShownInitialNotifications, setHasShownInitialNotifications] = useState(false);
 
   // Notification timers ref to sequence alerts and avoid duplicates
   const notificationTimersRef = useRef([]);
@@ -182,6 +184,8 @@ function ServiceType() {
       notificationTimersRef.current.forEach((t) => clearTimeout(t));
       notificationTimersRef.current = [];
     }
+    // Clear any existing antd notifications before scheduling new ones
+    notification.destroy();
 
     // Build the list of alerts
     const alerts = [];
@@ -236,16 +240,34 @@ function ServiceType() {
         );
         checkDeliveryRatio(filteredData);
       } else {
-        // When showing all data (Select All) or during initial load:
-        // 1) Hide dialog notification
+        // When showing all data (Select All) or during initial load
+        // Hide dialog notification
         setShowNotification(false);
         setNotificationMessage('');
-        // 2) Fire sequential toast notifications for all rows that meet the criteria
-        const rowsForDisplay = getDisplayedRows();
-        scheduleSequentialNotifications(rowsForDisplay);
+
+        // Only show sequential notifications once on initial page load
+        if (!hasShownInitialNotifications) {
+          const rowsForDisplay = getDisplayedRows();
+          scheduleSequentialNotifications(rowsForDisplay);
+          setHasShownInitialNotifications(true);
+        } else {
+          // If not initial load, ensure no lingering notifications remain
+          notification.destroy();
+        }
       }
     }
   }, [selectedServiceType, debouncedSearchValue, ApiBoilerSummaryData, userHasSelected]);
+
+  // On unmount: clear timers and destroy any active notifications so they don't persist across pages
+  useEffect(() => {
+    return () => {
+      if (notificationTimersRef.current && notificationTimersRef.current.length) {
+        notificationTimersRef.current.forEach((t) => clearTimeout(t));
+        notificationTimersRef.current = [];
+      }
+      notification.destroy();
+    };
+  }, []);
 
   // Create table data from API boiler summary data
   const createApiBoilerSummaryTableData = useMemo(() => {
@@ -371,7 +393,7 @@ function ServiceType() {
               <MDBox
                 mx={isMobile ? 1 : 2}
                 mt={isMobile ? -2 : -3}
-                py={isMobile ? 2 : 3}
+                py={isMobile ? 1.2 : 3}
                 px={isMobile ? 1 : 2}
                 variant="gradient"
                 bgColor="primary"
@@ -379,12 +401,12 @@ function ServiceType() {
                 coloredShadow="primary"
               >
                 <MDBox>
-                  <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
+                  <MDBox display="flex" justifyContent="space-between" alignItems={isMobile ? 'flex-start' : 'center'} mb={isMobile ? 1 : 2} flexDirection={isMobile ? 'column' : 'row'} gap={isMobile ? 1 : 0}>
+                    <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '13px' : '16px' }}>
                       Boiler Summary Data
                     </MDTypography>
-                    <MDBox display="flex" alignItems="center" gap={2}>
-                      <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '12px' : '14px' }}>
+                    <MDBox display="flex" alignItems="center" gap={isMobile ? 1 : 2} width={isMobile ? '100%' : 'auto'}>
+                      <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '11px' : '14px' }}>
                         Filter by Service Type:
                       </MDTypography>
                       <Autocomplete
@@ -418,10 +440,11 @@ function ServiceType() {
                             variant="outlined"
                             placeholder="Search service type..."
                             sx={{
-                              minWidth: isMobile ? '150px' : '200px',
+                              minWidth: isMobile ? '100%' : '200px',
+                              width: isMobile ? '100%' : 'auto',
                               '& .MuiOutlinedInput-root': {
                                 color: 'white',
-                                fontSize: isMobile ? '12px' : '14px',
+                                fontSize: isMobile ? '11px' : '14px',
                                 '& fieldset': {
                                   borderColor: 'rgba(255, 255, 255, 0.5)',
                                 },
@@ -434,7 +457,7 @@ function ServiceType() {
                               },
                               '& .MuiInputBase-input': {
                                 color: 'white',
-                                fontSize: isMobile ? '12px' : '14px',
+                                fontSize: isMobile ? '11px' : '14px',
                               },
                               '& .MuiInputBase-input::placeholder': {
                                 color: 'rgba(255, 255, 255, 0.7)',
@@ -469,8 +492,8 @@ function ServiceType() {
                   </MDBox>
                   
                   {/* Date Range Input Section */}
-                  <MDBox display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                    <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '12px' : '14px' }}>
+                  <MDBox display="flex" alignItems={isMobile ? 'stretch' : 'center'} gap={isMobile ? 1 : 2} flexWrap={isMobile ? 'nowrap' : 'wrap'} flexDirection={isMobile ? 'column' : 'row'}>
+                    <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '11px' : '14px' }}>
                       Date Range:
                     </MDTypography>
                     <TextField
@@ -483,10 +506,11 @@ function ServiceType() {
                         style: { color: 'rgba(255, 255, 255, 0.7)' }
                       }}
                       sx={{
-                        minWidth: isMobile ? '140px' : '160px',
+                        minWidth: isMobile ? '100%' : '160px',
+                        width: isMobile ? '100%' : 'auto',
                         '& .MuiOutlinedInput-root': {
                           color: 'white',
-                          fontSize: isMobile ? '12px' : '14px',
+                          fontSize: isMobile ? '11px' : '14px',
                           '& fieldset': {
                             borderColor: 'rgba(255, 255, 255, 0.5)',
                           },
@@ -499,7 +523,7 @@ function ServiceType() {
                         },
                         '& .MuiInputBase-input': {
                           color: 'white',
-                          fontSize: isMobile ? '12px' : '14px',
+                          fontSize: isMobile ? '11px' : '14px',
                         },
                         '& .MuiSvgIcon-root': {
                           color: 'white',
@@ -516,10 +540,11 @@ function ServiceType() {
                         style: { color: 'rgba(255, 255, 255, 0.7)' }
                       }}
                       sx={{
-                        minWidth: isMobile ? '140px' : '160px',
+                        minWidth: isMobile ? '100%' : '160px',
+                        width: isMobile ? '100%' : 'auto',
                         '& .MuiOutlinedInput-root': {
                           color: 'white',
-                          fontSize: isMobile ? '12px' : '14px',
+                          fontSize: isMobile ? '11px' : '14px',
                           '& fieldset': {
                             borderColor: 'rgba(255, 255, 255, 0.5)',
                           },
@@ -532,7 +557,7 @@ function ServiceType() {
                         },
                         '& .MuiInputBase-input': {
                           color: 'white',
-                          fontSize: isMobile ? '12px' : '14px',
+                          fontSize: isMobile ? '11px' : '14px',
                         },
                         '& .MuiSvgIcon-root': {
                           color: 'white',
@@ -545,9 +570,10 @@ function ServiceType() {
                       size="small"
                       onClick={handleConfirmClick}
                       sx={{
-                        fontSize: isMobile ? '12px' : '14px',
-                        minWidth: isMobile ? '80px' : '100px',
-                        height: isMobile ? '36px' : '40px',
+                        fontSize: isMobile ? '11px' : '14px',
+                        minWidth: isMobile ? '100%' : '100px',
+                        width: isMobile ? '100%' : 'auto',
+                        height: isMobile ? '34px' : '40px',
                       }}
                     >
                       Confirm
@@ -574,22 +600,22 @@ function ServiceType() {
                     defaultPageSize={1000}
                     sx={{
                       minWidth: isMobile ? '100%' : 'auto',
-                      fontSize: isMobile ? '12px' : '14px',
+                      fontSize: isMobile ? '11px' : '14px',
                       '& .MuiTableCell-root': {
-                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                        padding: isMobile ? '6px 3px' : isTablet ? '10px 6px' : '12px 8px',
                         borderSpacing: isMobile ? '2px' : '4px',
-                        fontSize: isMobile ? '12px' : '14px',
+                        fontSize: isMobile ? '11px' : '14px',
                         color: darkMode ? '#ffffff' : '#000000',
                         fontWeight: '500',
                       },
                       '& .MuiTableHead-root .MuiTableCell-root': {
-                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                        fontSize: isMobile ? '12px' : '14px',
+                        padding: isMobile ? '8px 3px' : isTablet ? '12px 6px' : '14px 8px',
+                        fontSize: isMobile ? '11px' : '14px',
                         color: darkMode ? '#ffffff' : '#000000',
                         fontWeight: 600,
                       },
                       '& .MuiTableBody-root .MuiTableCell-root': {
-                        fontSize: isMobile ? '12px' : '14px',
+                        fontSize: isMobile ? '11px' : '14px',
                         color: darkMode ? '#ffffff' : '#000000',
                         fontWeight: '500',
                       },
