@@ -35,7 +35,7 @@ const baseRoutes = [
     icon: <Icon fontSize="small">category</Icon>,
     route: "/tables/service-type",
     component: <ServiceType />,
-    adminOnly: true,
+    // adminOnly: true,
   },
   {
     type: "collapse",
