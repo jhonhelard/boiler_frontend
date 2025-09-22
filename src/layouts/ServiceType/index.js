@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useContext } from "react";
+import { useState, useEffect, useMemo, useContext, useRef } from "react";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { Autocomplete, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from "@mui/material";
@@ -54,6 +54,10 @@ function ServiceType() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [userHasSelected, setUserHasSelected] = useState(false);
+
+  // Notification timers ref to sequence alerts and avoid duplicates
+  const notificationTimersRef = useRef([]);
+  const NOTIFICATION_INTERVAL_MS = 1500; // time gap between sequential notifications
 
 
   // Debounce search input to prevent too many re-renders
@@ -147,6 +151,66 @@ function ServiceType() {
     });
   };
 
+  // Build rows exactly as displayed in the table (respecting filters/search)
+  const getDisplayedRows = () => {
+    if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData)) return [];
+
+    let rows = ApiBoilerSummaryData.map((item) => ({
+      serviceType: item.serviceType || 'N/A',
+      totalApplications: item["Total Applications Received 2024-2025"] || item["total Application Received 2024-2025"] || 0,
+      totalDisposed: item.total_Disposed || 0,
+      pending: item.pending || 0,
+      approved: item.approved || 0,
+      rejected: item.rejected || 0,
+      deliveredOnTime: item["is Delivered on time"] || item["is Delivered ontime"] || 0,
+      notDeliveredOnTime: item["is NOT Delivered on time"] || item["is NOT Delivered ontime"] || 0,
+    }));
+
+    if (selectedServiceType !== 'Select All') {
+      rows = rows.filter(row => row.serviceType === selectedServiceType);
+    } else if (debouncedSearchValue && debouncedSearchValue !== 'Select All') {
+      rows = rows.filter(row => row.serviceType.toLowerCase().includes(debouncedSearchValue.toLowerCase()));
+    }
+
+    return rows;
+  };
+
+  // Schedule sequential notifications for all items meeting the >10% rule
+  const scheduleSequentialNotifications = (rows) => {
+    // Clear any previous timers
+    if (notificationTimersRef.current && notificationTimersRef.current.length) {
+      notificationTimersRef.current.forEach((t) => clearTimeout(t));
+      notificationTimersRef.current = [];
+    }
+
+    // Build the list of alerts
+    const alerts = [];
+    rows.forEach((row) => {
+      const total = row.totalApplications || 0;
+      const notOnTime = row.notDeliveredOnTime || 0;
+      const ratio = total > 0 ? (notOnTime / total) * 100 : 0;
+      if (ratio > 10 && notOnTime > 0) {
+        alerts.push({
+          serviceType: row.serviceType,
+          notOnTime,
+        });
+      }
+    });
+
+    // Schedule notifications in sequence
+    alerts.forEach((item, index) => {
+      const timer = setTimeout(() => {
+        notification.warning({
+          message: 'Delivery Alert',
+          description: `${item.serviceType} ${item.notOnTime} not delivered on time.`,
+          placement: 'topRight',
+          duration: 3,
+        });
+      }, index * NOTIFICATION_INTERVAL_MS);
+      notificationTimersRef.current.push(timer);
+    });
+  };
+
   // Effect to check delivery ratio when service type selection changes
   useEffect(() => {
     if (ApiBoilerSummaryData && ApiBoilerSummaryData.length > 0) {
@@ -172,9 +236,13 @@ function ServiceType() {
         );
         checkDeliveryRatio(filteredData);
       } else {
-        // When showing all data (Select All) or during initial load, hide any existing notifications
+        // When showing all data (Select All) or during initial load:
+        // 1) Hide dialog notification
         setShowNotification(false);
         setNotificationMessage('');
+        // 2) Fire sequential toast notifications for all rows that meet the criteria
+        const rowsForDisplay = getDisplayedRows();
+        scheduleSequentialNotifications(rowsForDisplay);
       }
     }
   }, [selectedServiceType, debouncedSearchValue, ApiBoilerSummaryData, userHasSelected]);
