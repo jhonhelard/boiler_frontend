@@ -2260,9 +2260,79 @@ function Sheet2() {
                   )}
                 </MDBox>
               </MDBox>
+              {/* Inserted: Boiler as per Various District table positioned below Region selector */}
+              <MDBox pt={isMobile ? 2 : 3} pb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                <Grid container spacing={isMobile ? 2 : 6}>
+                  <Grid item xs={12}>
+                    <Card>
+                      <MDBox
+                        mx={isMobile ? 1 : 2}
+                        mt={isMobile ? -2 : -3}
+                        py={isMobile ? 2 : 3}
+                        px={isMobile ? 1 : 2}
+                        variant="gradient"
+                        bgColor="success"
+                        borderRadius="lg"
+                        coloredShadow="success"
+                      >
+                        <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
+                          {selectedCity || 'Region'} : Boiler as per Various District
+                        </MDTypography>
+                      </MDBox>
+                      <MDBox pt={isMobile ? 2 : 3}>
+                        <div style={{
+                          overflowX: 'auto',
+                          overflowY: 'auto',
+                          maxWidth: '100%',
+                          maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                        }}>
+                          <DataTable
+                            key={`district-table-${selectedCity}`}
+                            table={perVariousTableData}
+                            entriesPerPage={false}
+                            canSearch={false}
+                            showTotalEntries={false}
+                            isLoading={loading}
+                            isSorted={false}
+                            defaultPageSize={1000}
+                            sx={{
+                              minWidth: isMobile ? '100%' : 'auto',
+                              fontSize: isMobile ? '12px' : '14px',
+                              '& .MuiTableCell-root': {
+                                padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                borderSpacing: isMobile ? '2px' : '4px',
+                                fontSize: isMobile ? '12px' : '14px',
+                                color: darkMode ? '#ffffff' : '#000000',
+                                fontWeight: '500',
+                              },
+                              '& .MuiTableHead-root .MuiTableCell-root': {
+                                padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                fontSize: isMobile ? '12px' : '14px',
+                                color: darkMode ? '#ffffff' : '#000000',
+                                fontWeight: 600,
+                              },
+                              '& .MuiTableBody-root .MuiTableCell-root': {
+                                fontSize: isMobile ? '12px' : '14px',
+                                color: darkMode ? '#ffffff' : '#000000',
+                                fontWeight: '500',
+                              },
+                              '& .MuiTableContainer-root': {
+                                height: '100%',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                              },
+                            }}
+                          />
+                        </div>
+                      </MDBox>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </MDBox>
+
               <MDBox
                 mx={isMobile ? 1 : 2}
-                mt={isMobile ? -2 : -3}
+                mt={isMobile ? 2 : 3}
                 py={isMobile ? 2 : 3}
                 px={isMobile ? 1 : 2}
                 variant="gradient"
@@ -3995,8 +4065,8 @@ function Sheet2() {
                     </Grid>
                   </MDBox>
 
-                  {/* District Chart Section */}
-                  <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
+                  {/* District Chart Section (moved higher for table-first placement) */}
+                  <MDBox mb={isMobile ? 2 : 3} style={{ display: 'none' }}>
                     {/* Single Header for the entire District section */}
                     <MDBox
                       mx={isMobile ? 1 : 2}
@@ -4203,73 +4273,6 @@ function Sheet2() {
                     </Grid>
                   </MDBox>
                     
-                  <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
-                      <Grid container spacing={isMobile ? 2 : 6}>
-                        <Grid item xs={12}>
-                          <Card>
-                            <MDBox
-                              mx={isMobile ? 1 : 2}
-                              mt={isMobile ? -2 : -3}
-                              py={isMobile ? 2 : 3}
-                              px={isMobile ? 1 : 2}
-                              variant="gradient"
-                              bgColor="success"
-                              borderRadius="lg"
-                              coloredShadow="success"
-                            >
-                              <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                                {selectedCity || 'Region'} : Boiler as per Various District
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox pt={isMobile ? 2 : 3}>
-                              <div style={{
-                                overflowX: 'auto',
-                                overflowY: 'auto',
-                                maxWidth: '100%',
-                                maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
-                              }}>
-                                <DataTable
-                                  key={`district-table-${selectedCity}`}
-                                  table={perVariousTableData}
-                                  entriesPerPage={false}
-                                  canSearch={false}
-                                  showTotalEntries={false}
-                                  isLoading={loading}
-                                  isSorted={false}
-                                  defaultPageSize={1000}
-                                  sx={{
-                                    minWidth: isMobile ? '100%' : 'auto',
-                                    fontSize: isMobile ? '12px' : '14px',
-                                    '& .MuiTableCell-root': {
-                                      padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                                      borderSpacing: isMobile ? '2px' : '4px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableHead-root .MuiTableCell-root': {
-                                      padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: 600,
-                                    },
-                                    '& .MuiTableBody-root .MuiTableCell-root': {
-                                      fontSize: isMobile ? '12px' : '14px',
-                                      color: darkMode ? '#ffffff' : '#000000',
-                                      fontWeight: '500',
-                                    },
-                                    '& .MuiTableContainer-root': {
-                                      height: '100%',
-                                    },
-                                  }}
-                                />
-                              </div>
-                            </MDBox>
-                          </Card>
-                        </Grid>
-                      </Grid>
-                    </MDBox>
-
                     {/* Industries Chart Section */}
                     <MDBox mb={isMobile ? 2 : 3} style={{ display: isMaharashtraSelected ? 'none' : 'block' }}>
                       {/* Single Header for the entire Industries section */}

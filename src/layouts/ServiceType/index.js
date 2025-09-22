@@ -146,7 +146,7 @@ function ServiceType() {
       
       // Show notification if ratio exceeds 10%
       if (deliveryRatio > 10) {
-        const message = `${item.serviceType} Boiler was not delivered on time.`;
+        const message = `${item.serviceType} ${notDeliveredOnTime} not delivered on time.`;
         setNotificationMessage(message);
         setShowNotification(true);
       }
@@ -670,18 +670,12 @@ function ServiceType() {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        
+
         <DialogContent sx={{ pt: 3, pb: 2 }}>
           <MDBox display="flex" alignItems="center" gap={2}>
             <WarningIcon sx={{ color: 'warning.main', fontSize: '24px' }} />
             <MDTypography variant="body1" color="text" sx={{ fontSize: '16px', lineHeight: 1.5 }}>
               {notificationMessage}
-            </MDTypography>
-          </MDBox>
-          
-          <MDBox mt={2}>
-            <MDTypography variant="body2" color="text.secondary" sx={{ fontSize: '14px' }}>
-              The delivery ratio for this service type exceeds 10%, indicating potential delays in service delivery.
             </MDTypography>
           </MDBox>
         </DialogContent>
