@@ -1,3 +1,29 @@
+// Utility function to process labels for better chart display
+export const processLabelForChart = (label) => {
+  if (!label) return '';
+  
+  // If label is very long, create a shorter version
+  if (label.length > 30) {
+    // Try to find a good break point
+    const words = label.split(' ');
+    let shortLabel = '';
+    let currentLength = 0;
+    
+    for (const word of words) {
+      if (currentLength + word.length + 1 <= 25) {
+        shortLabel += (shortLabel ? ' ' : '') + word;
+        currentLength += word.length + 1;
+      } else {
+        break;
+      }
+    }
+    
+    return shortLabel.length > 0 ? shortLabel + '...' : label.substring(0, 22) + '...';
+  }
+  
+  return label;
+};
+
 export const processPieChartData = (dataArray, selectedCity) => {
   if (!dataArray || !Array.isArray(dataArray) || dataArray.length < 2 || !selectedCity) {
     return { labels: [], datasets: {} };
@@ -18,7 +44,7 @@ export const processPieChartData = (dataArray, selectedCity) => {
 
   labels.forEach((label, index) => {
     if (data[index] > 0 && !label.toLowerCase().includes('total')) {
-      filteredLabels.push(label);
+      filteredLabels.push(processLabelForChart(label));
       filteredData.push(data[index]);
     }
   });
@@ -64,7 +90,7 @@ export const processBarChartData = (dataArray, selectedCity) => {
 
   labels.forEach((label, index) => {
     if (data[index] > 0 && !label.toLowerCase().includes('total')) {
-      filteredLabels.push(label);
+      filteredLabels.push(processLabelForChart(label));
       filteredData.push(data[index]);
     }
   });

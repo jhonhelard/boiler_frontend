@@ -94,8 +94,9 @@ function VerticalBarChart({ icon, title, description, height, chart, customOptio
             <MDBox sx={{ overflowX: "auto", width: "100%", height: "100%" }}>
               <MDBox
                 sx={{
-                  minWidth: `${Math.max(600, (data.labels && data.labels.length ? data.labels.length : 0) * 80)}px`,
+                  minWidth: `${Math.max(600, (data.labels && data.labels.length ? data.labels.length : 0) * 100)}px`,
                   height: "100%",
+                  paddingBottom: "20px", // Add space for rotated labels
                 }}
               >
                 <Chart type="bar" data={data} options={finalOptions} />

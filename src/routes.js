@@ -2,6 +2,7 @@ import Tables from "layouts/tables";
 import Sheet2 from "layouts/sheet2";
 import CityName from "layouts/cityName"
 import Sheet1 from "layouts/sheet1"
+import ServiceType from "layouts/ServiceType"
 
 import Login from "auth/login";
 import Register from "auth/register";
@@ -26,6 +27,14 @@ const baseRoutes = [
     icon: <Icon fontSize="small">delivery_dining</Icon>,
     route: "/tables/boiler-details",
     component: <Sheet1 />,
+  },
+  {
+    type: "collapse",
+    name: "Service Type",
+    key: "tables/service-type",
+    icon: <Icon fontSize="small">category</Icon>,
+    route: "/tables/service-type",
+    component: <ServiceType />,
   },
   {
     type: "collapse",

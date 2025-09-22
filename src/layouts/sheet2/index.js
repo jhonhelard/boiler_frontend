@@ -25,7 +25,7 @@ import { notification } from "antd";
 import MDButton from "components/MDButton";
 import { useMaterialUIController } from "context";
 import useResponsive from "./useResponsive";
-import { convertPieToBarChartData, convertBarToPieChartData, processPieChartData, processBarChartData } from "./chartUtils";
+import { convertPieToBarChartData, convertBarToPieChartData, processPieChartData, processBarChartData, processLabelForChart } from "./chartUtils";
 import { Autocomplete, TextField } from "@mui/material";
 
 // Add global test function
@@ -83,22 +83,11 @@ function Sheet2() {
   const [economisersChartType, setEconomisersChartType] = useState('Pie Chart');
   const [boilerRegisteredChartType, setBoilerRegisteredChartType] = useState('Bar Chart');
   const [economisersManufacturedChartType, setEconomisersManufacturedChartType] = useState('Bar Chart');
-  
-  // API Boiler Summary filter state
-  const [selectedServiceType, setSelectedServiceType] = useState('Select All');
-  const [serviceTypeSearchValue, setServiceTypeSearchValue] = useState('Select All');
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState('Select All');
+  const [accidentChartType, setAccidentChartType] = useState('Bar Chart');
+  const [cityAccidentChartType, setCityAccidentChartType] = useState('Bar Chart');
+  const [maharashtraEconomiserChartType, setMaharashtraEconomiserChartType] = useState('Bar Chart');
   
   const { isAdmin, userInfo } = useContext(AuthContext);
-  
-  // Debounce search input to prevent too many re-renders
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchValue(serviceTypeSearchValue);
-    }, 300); // 300ms delay
-
-    return () => clearTimeout(timer);
-  }, [serviceTypeSearchValue]);
   
   // Suppress debug console logs while this page is mounted
   useEffect(() => {
@@ -126,7 +115,6 @@ function Sheet2() {
   const [EconomiserStatus, setEconomiserStatus] = useState([]);
   const [RunningEconomisers, setRunningEconomisers] = useState([]);
   const [Accident, setAccident] = useState([]);
-  const [ApiBoilerSummaryData, setApiBoilerSummaryData] = useState([]);
 
   
   
@@ -363,8 +351,7 @@ function Sheet2() {
       setPerVarious(data[11]);
       setEconomiserStatus(data[12]);
       setRunningEconomisers(data[13]);
-      setAccident(data[14]);
-      setApiBoilerSummaryData(data[15]);      
+      setAccident(data[14]);      
     } catch (err) {
       console.error("Error fetching sheet data:", err);
       dispatch(setSheet1([]));
@@ -381,8 +368,7 @@ function Sheet2() {
       setPerVarious([]);
       setEconomiserStatus([]);
       setRunningEconomisers([]);
-      setAccident([]); 
-      setApiBoilerSummaryData([]);
+      setAccident([]);
       notification.error({
         message: "Error",
         description: "Failed to fetch sheet data. Please try again later.",
@@ -410,8 +396,7 @@ function Sheet2() {
         setPerVarious(response.data[12]);
         setEconomiserStatus(response.data[13]);
         setRunningEconomisers(response.data[14]);
-        setAccident(response.data[15]);    
-        setApiBoilerSummaryData(response.data[16]);      
+        setAccident(response.data[15]);      
 
         notification.success({
           message: 'Data Refreshed Successfully!',
@@ -696,7 +681,7 @@ function Sheet2() {
       const chartLabels = [];
       for (let i = startColumn; i <= endColumn; i++) {
         if (sheetData2[0][i]) {
-          chartLabels.push(sheetData2[0][i]);
+          chartLabels.push(processLabelForChart(sheetData2[0][i]));
         }
       }
 
@@ -956,38 +941,56 @@ function Sheet2() {
     return processPieChartData(perType, selectedCity);
   }, [perType, selectedCity]);
 
-  // Process perType data for Maharashtra total (by region totals)
+  // Process perType data for Maharashtra total (by indicator/boiler type)
   const maharashtraTotalPieChartData = useMemo(() => {
     if (!perType || perType.length === 0) {
       return { labels: [], datasets: {} };
     }
     
-    // Extract region names and their totals from the last column
-    const regionLabels = [];
-    const regionTotals = [];
-    
-    // Process each region row (skip header row and any total row)
-    for (let i = 1; i < perType.length; i++) {
-      const row = perType[i];
-      if (row && row[0] && row[0].trim() !== '') {
-        const regionName = row[0];
-        
-        // Skip if this is a total row (check for common total indicators)
-        if (regionName.toLowerCase().includes('total') || 
-            regionName.toLowerCase().includes('sum') ||
-            regionName.toLowerCase().includes('grand')) {
-          continue;
-        }
-        
-        // Get the total from the last column of each row
-        const totalValue = parseInt(row[row.length - 1]) || 0;
-        
-        if (totalValue > 0) {
-          regionLabels.push(regionName);
-          regionTotals.push(totalValue);
-        }
+    // Extract column headers (indicators/boiler types) from header row (skip first column which is region name)
+    const indicatorLabels = [];
+    for (let i = 1; i < perType[0].length; i++) {
+      if (perType[0][i] && perType[0][i].trim() !== '') {
+        indicatorLabels.push(perType[0][i]);
       }
     }
+    
+    // Calculate totals for each indicator across all regions
+    const indicatorTotals = [];
+    for (let colIndex = 1; colIndex < perType[0].length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this indicator across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < perType.length; rowIndex++) {
+        const row = perType[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      indicatorTotals.push(total);
+    }
+
+    // Filter out indicators with zero totals
+    const filteredLabels = [];
+    const filteredTotals = [];
+    
+    indicatorLabels.forEach((label, index) => {
+      if (indicatorTotals[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredTotals.push(indicatorTotals[index]);
+      }
+    });
 
     // Define colors for pie chart segments
     const backgroundColors = [
@@ -998,11 +1001,11 @@ function Sheet2() {
     ];
 
     return {
-      labels: regionLabels,
+      labels: filteredLabels,
       datasets: {
-        label: "Maharashtra Total by Region",
-        data: regionTotals,
-        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+        label: "Maharashtra Total by Boiler Type",
+        data: filteredTotals,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
       }
     };
   }, [perType]);
@@ -1012,38 +1015,56 @@ function Sheet2() {
     return processPieChartData(perFuelUsed, selectedCity);
   }, [perFuelUsed, selectedCity]);
 
-  // Process perFuelUsed data for Maharashtra total (by region totals)
+  // Process perFuelUsed data for Maharashtra total (by fuel type indicator)
   const maharashtraFuelTotalPieChartData = useMemo(() => {
     if (!perFuelUsed || perFuelUsed.length === 0) {
       return { labels: [], datasets: {} };
     }
     
-    // Extract region names and their totals from the last column
-    const regionLabels = [];
-    const regionTotals = [];
-    
-    // Process each region row (skip header row and any total row)
-    for (let i = 1; i < perFuelUsed.length; i++) {
-      const row = perFuelUsed[i];
-      if (row && row[0] && row[0].trim() !== '') {
-        const regionName = row[0];
-        
-        // Skip if this is a total row (check for common total indicators)
-        if (regionName.toLowerCase().includes('total') || 
-            regionName.toLowerCase().includes('sum') ||
-            regionName.toLowerCase().includes('grand')) {
-          continue;
-        }
-        
-        // Get the total from the last column of each row
-        const totalValue = parseInt(row[row.length - 1]) || 0;
-        
-        if (totalValue > 0) {
-          regionLabels.push(regionName);
-          regionTotals.push(totalValue);
-        }
+    // Extract column headers (fuel types/indicators) from header row (skip first column which is region name)
+    const fuelTypeLabels = [];
+    for (let i = 1; i < perFuelUsed[0].length; i++) {
+      if (perFuelUsed[0][i] && perFuelUsed[0][i].trim() !== '') {
+        fuelTypeLabels.push(perFuelUsed[0][i]);
       }
     }
+    
+    // Calculate totals for each fuel type across all regions
+    const fuelTypeTotals = [];
+    for (let colIndex = 1; colIndex < perFuelUsed[0].length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this fuel type across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < perFuelUsed.length; rowIndex++) {
+        const row = perFuelUsed[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      fuelTypeTotals.push(total);
+    }
+
+    // Filter out fuel types with zero totals
+    const filteredLabels = [];
+    const filteredTotals = [];
+    
+    fuelTypeLabels.forEach((label, index) => {
+      if (fuelTypeTotals[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredTotals.push(fuelTypeTotals[index]);
+      }
+    });
 
     // Define colors for pie chart segments
     const backgroundColors = [
@@ -1054,11 +1075,11 @@ function Sheet2() {
     ];
 
     return {
-      labels: regionLabels,
+      labels: filteredLabels,
       datasets: {
-        label: "Maharashtra Total by Region",
-        data: regionTotals,
-        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+        label: "Maharashtra Total by Fuel Type",
+        data: filteredTotals,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
       }
     };
   }, [perFuelUsed]);
@@ -1070,44 +1091,62 @@ function Sheet2() {
     return processBarChartData(perCapacity, selectedCity);
   }, [perCapacity, selectedCity]);
 
-  // Process perCapacity data for Maharashtra total (by region totals)
+  // Process perCapacity data for Maharashtra total (by capacity indicator)
   const maharashtraCapacityTotalBarChartData = useMemo(() => {
     if (!perCapacity || perCapacity.length === 0) {
       return { labels: [], datasets: [] };
     }
     
-    // Extract region names and their totals from the last column
-    const regionLabels = [];
-    const regionTotals = [];
-    
-    // Process each region row (skip header row and any total row)
-    for (let i = 1; i < perCapacity.length; i++) {
-      const row = perCapacity[i];
-      if (row && row[0] && row[0].trim() !== '') {
-        const regionName = row[0];
-        
-        // Skip if this is a total row (check for common total indicators)
-        if (regionName.toLowerCase().includes('total') || 
-            regionName.toLowerCase().includes('sum') ||
-            regionName.toLowerCase().includes('grand')) {
-          continue;
-        }
-        
-        // Get the total from the last column of each row
-        const totalValue = parseInt(row[row.length - 1]) || 0;
-        
-        if (totalValue > 0) {
-          regionLabels.push(regionName);
-          regionTotals.push(totalValue);
-        }
+    // Extract column headers (capacity indicators) from header row (skip first column which is region name)
+    const capacityLabels = [];
+    for (let i = 1; i < perCapacity[0].length; i++) {
+      if (perCapacity[0][i] && perCapacity[0][i].trim() !== '') {
+        capacityLabels.push(perCapacity[0][i]);
       }
     }
+    
+    // Calculate totals for each capacity indicator across all regions
+    const capacityTotals = [];
+    for (let colIndex = 1; colIndex < perCapacity[0].length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this capacity indicator across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < perCapacity.length; rowIndex++) {
+        const row = perCapacity[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      capacityTotals.push(total);
+    }
+
+    // Filter out capacity indicators with zero totals
+    const filteredLabels = [];
+    const filteredTotals = [];
+    
+    capacityLabels.forEach((label, index) => {
+      if (capacityTotals[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredTotals.push(capacityTotals[index]);
+      }
+    });
 
     return {
-      labels: regionLabels,
+      labels: filteredLabels,
       datasets: [{
-        label: "Maharashtra Total by Region",
-        data: regionTotals,
+        label: "Maharashtra Total by Capacity",
+        data: filteredTotals,
         color: "warning"
       }]
     };
@@ -1118,44 +1157,62 @@ function Sheet2() {
     return processBarChartData(certificate, selectedCity);
   }, [certificate, selectedCity]);
 
-  // Process certificates data for Maharashtra total (by region totals)
+  // Process certificates data for Maharashtra total (by certificate type indicator)
   const maharashtraCertificateTotalBarChartData = useMemo(() => {
     if (!certificate || certificate.length === 0) {
       return { labels: [], datasets: [] };
     }
     
-    // Extract region names and their totals from the last column
-    const regionLabels = [];
-    const regionTotals = [];
-    
-    // Process each region row (skip header row and any total row)
-    for (let i = 1; i < certificate.length; i++) {
-      const row = certificate[i];
-      if (row && row[0] && row[0].trim() !== '') {
-        const regionName = row[0];
-        
-        // Skip if this is a total row (check for common total indicators)
-        if (regionName.toLowerCase().includes('total') || 
-            regionName.toLowerCase().includes('sum') ||
-            regionName.toLowerCase().includes('grand')) {
-          continue;
-        }
-        
-        // Get the total from the last column of each row
-        const totalValue = parseInt(row[row.length - 1]) || 0;
-        
-        if (totalValue > 0) {
-          regionLabels.push(regionName);
-          regionTotals.push(totalValue);
-        }
+    // Extract column headers (certificate type indicators) from header row (skip first column which is region name)
+    const certificateLabels = [];
+    for (let i = 1; i < certificate[0].length; i++) {
+      if (certificate[0][i] && certificate[0][i].trim() !== '') {
+        certificateLabels.push(certificate[0][i]);
       }
     }
+    
+    // Calculate totals for each certificate type across all regions
+    const certificateTotals = [];
+    for (let colIndex = 1; colIndex < certificate[0].length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this certificate type across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < certificate.length; rowIndex++) {
+        const row = certificate[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      certificateTotals.push(total);
+    }
+
+    // Filter out certificate types with zero totals
+    const filteredLabels = [];
+    const filteredTotals = [];
+    
+    certificateLabels.forEach((label, index) => {
+      if (certificateTotals[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredTotals.push(certificateTotals[index]);
+      }
+    });
 
     return {
-      labels: regionLabels,
+      labels: filteredLabels,
       datasets: [{
-        label: "Maharashtra Total by Region",
-        data: regionTotals,
+        label: "Maharashtra Total by Certificate Type",
+        data: filteredTotals,
         color: "error"
       }]
     };
@@ -1298,6 +1355,114 @@ function Sheet2() {
     };
   }, [Accidents]);
 
+  // Create table data from accidents line chart data
+  const accidentsTableData = useMemo(() => {
+    if (!accidentsLineChartData || !accidentsLineChartData.labels || accidentsLineChartData.labels.length === 0) {
+      return { columns: [], rows: [] };
+    }
+
+    const columns = [
+      {
+        Header: "Year",
+        accessor: "year",
+        width: "30%",
+      },
+      {
+        Header: "Total Accidents",
+        accessor: "totalAccidents",
+        width: "23%",
+      },
+      {
+        Header: "Deaths",
+        accessor: "deaths",
+        width: "23%",
+      },
+      {
+        Header: "Injuries",
+        accessor: "injuries",
+        width: "24%",
+      },
+    ];
+
+    const rows = [];
+    const { labels, datasets } = accidentsLineChartData;
+    
+    // Find the datasets for each metric
+    const totalAccidentsData = datasets.find(d => d.label === 'Total No of Accidents')?.data || [];
+    const deathsData = datasets.find(d => d.label === 'Death')?.data || [];
+    const injuriesData = datasets.find(d => d.label === 'Injury')?.data || [];
+
+    labels.forEach((year, index) => {
+      rows.push({
+        year: year,
+        totalAccidents: totalAccidentsData[index] || 0,
+        deaths: deathsData[index] || 0,
+        injuries: injuriesData[index] || 0,
+      });
+    });
+
+    return { columns, rows };
+  }, [accidentsLineChartData]);
+
+  // Convert accidents line chart data to bar chart format
+  const accidentsBarChartData = useMemo(() => {
+    if (!accidentsLineChartData || !accidentsLineChartData.labels || accidentsLineChartData.labels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    const { labels, datasets } = accidentsLineChartData;
+    
+    // Convert line chart datasets to bar chart format
+    const barDatasets = datasets.map((dataset, index) => ({
+      label: dataset.label,
+      data: dataset.data,
+      color: dataset.color
+    }));
+
+    return {
+      labels: labels,
+      datasets: barDatasets
+    };
+  }, [accidentsLineChartData]);
+
+  // Convert accidents line chart data to pie chart format (aggregated by year)
+  const accidentsPieChartData = useMemo(() => {
+    if (!accidentsLineChartData || !accidentsLineChartData.labels || accidentsLineChartData.labels.length === 0) {
+      return { labels: [], datasets: {} };
+    }
+
+    const { labels, datasets } = accidentsLineChartData;
+    
+    // Aggregate data across all years for each metric
+    const aggregatedData = [];
+    const aggregatedLabels = [];
+    
+    datasets.forEach(dataset => {
+      const total = dataset.data.reduce((sum, value) => sum + value, 0);
+      if (total > 0) {
+        aggregatedLabels.push(dataset.label);
+        aggregatedData.push(total);
+      }
+    });
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+      "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+      "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+      "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
+    ];
+
+    return {
+      labels: aggregatedLabels,
+      datasets: {
+        label: "Accident Statistics Total",
+        data: aggregatedData,
+        backgroundColors: backgroundColors.slice(0, aggregatedLabels.length)
+      }
+    };
+  }, [accidentsLineChartData]);
+
   // Process Accident data for city-specific line chart display
   const cityAccidentLineChartData = useMemo(() => {
     if (!Accident || !Array.isArray(Accident) || Accident.length === 0) {
@@ -1366,6 +1531,114 @@ function Sheet2() {
     };
   }, [Accident, selectedCity]);
 
+  // Convert city accident line chart data to bar chart format
+  const cityAccidentBarChartData = useMemo(() => {
+    if (!cityAccidentLineChartData || !cityAccidentLineChartData.labels || cityAccidentLineChartData.labels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    const { labels, datasets } = cityAccidentLineChartData;
+    
+    // Convert line chart datasets to bar chart format
+    const barDatasets = datasets.map((dataset, index) => ({
+      label: dataset.label,
+      data: dataset.data,
+      color: dataset.color
+    }));
+
+    return {
+      labels: labels,
+      datasets: barDatasets
+    };
+  }, [cityAccidentLineChartData]);
+
+  // Convert city accident line chart data to pie chart format (aggregated by year)
+  const cityAccidentPieChartData = useMemo(() => {
+    if (!cityAccidentLineChartData || !cityAccidentLineChartData.labels || cityAccidentLineChartData.labels.length === 0) {
+      return { labels: [], datasets: {} };
+    }
+
+    const { labels, datasets } = cityAccidentLineChartData;
+    
+    // Aggregate data across all years for each metric
+    const aggregatedData = [];
+    const aggregatedLabels = [];
+    
+    datasets.forEach(dataset => {
+      const total = dataset.data.reduce((sum, value) => sum + value, 0);
+      if (total > 0) {
+        aggregatedLabels.push(dataset.label);
+        aggregatedData.push(total);
+      }
+    });
+
+    // Define colors for pie chart segments
+    const backgroundColors = [
+      "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+      "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939",
+      "#8c6d31", "#843c39", "#7b4173", "#3182bd", "#e6550d", "#31a354",
+      "#756bb1", "#636363", "#bdbdbd", "#9ecae1", "#fd8d3c", "#74c476"
+    ];
+
+    return {
+      labels: aggregatedLabels,
+      datasets: {
+        label: `${selectedCity} Accident Statistics Total`,
+        data: aggregatedData,
+        backgroundColors: backgroundColors.slice(0, aggregatedLabels.length)
+      }
+    };
+  }, [cityAccidentLineChartData, selectedCity]);
+
+  // Create table data from city accident line chart data
+  const cityAccidentTableData = useMemo(() => {
+    if (!cityAccidentLineChartData || !cityAccidentLineChartData.labels || cityAccidentLineChartData.labels.length === 0) {
+      return { columns: [], rows: [] };
+    }
+
+    const columns = [
+      {
+        Header: "Year",
+        accessor: "year",
+        width: "30%",
+      },
+      {
+        Header: "Total Accidents",
+        accessor: "totalAccidents",
+        width: "23%",
+      },
+      {
+        Header: "Deaths",
+        accessor: "deaths",
+        width: "23%",
+      },
+      {
+        Header: "Injuries",
+        accessor: "injuries",
+        width: "24%",
+      },
+    ];
+
+    const rows = [];
+    const { labels, datasets } = cityAccidentLineChartData;
+    
+    // Find the datasets for each metric
+    const totalAccidentsData = datasets.find(d => d.label === 'Total No of Accidents')?.data || [];
+    const deathsData = datasets.find(d => d.label === 'Death')?.data || [];
+    const injuriesData = datasets.find(d => d.label === 'Injury')?.data || [];
+
+    labels.forEach((year, index) => {
+      rows.push({
+        year: year,
+        totalAccidents: totalAccidentsData[index] || 0,
+        deaths: deathsData[index] || 0,
+        injuries: injuriesData[index] || 0,
+      });
+    });
+
+    return { columns, rows };
+  }, [cityAccidentLineChartData]);
+
   // Process EconomiserStatus data for bar chart display (Region-wise data)
   const economiserStatusBarChartData = useMemo(() => {
     if (!EconomiserStatus || !Array.isArray(EconomiserStatus) || EconomiserStatus.length < 2) {
@@ -1418,6 +1691,73 @@ function Sheet2() {
       ]
     };
   }, [EconomiserStatus, selectedCity]);
+
+  // Process EconomiserStatus data for Maharashtra total (aggregated across all regions)
+  const maharashtraEconomiserStatusBarChartData = useMemo(() => {
+    if (!EconomiserStatus || !Array.isArray(EconomiserStatus) || EconomiserStatus.length < 2) {
+      return { labels: [], datasets: [] };
+    }
+
+    // EconomiserStatus has a structure with region-wise data:
+    // Element 0: ['Region', 'Running Economiser', 'Not offered since last 365 Da', ...]
+    // Element 1: ['Pune', '31', '11', '87', '129']
+    // Element 2: ['Mumbai', '30', '7', '15', '52']
+    // etc...
+    
+    const headerRow = EconomiserStatus[0] || [];
+    const labels = headerRow.slice(1).filter(label => label && label.trim() !== '');
+    
+    // Calculate totals for each indicator across all regions
+    const aggregatedData = [];
+    for (let colIndex = 1; colIndex < headerRow.length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this indicator across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < EconomiserStatus.length; rowIndex++) {
+        const row = EconomiserStatus[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      aggregatedData.push(total);
+    }
+    
+    // Filter out indicators with zero totals
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    labels.forEach((label, index) => {
+      if (aggregatedData[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredData.push(aggregatedData[index]);
+      }
+    });
+
+    // If no data with values > 0, return empty structure
+    if (filteredLabels.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: filteredLabels,
+      datasets: [{
+        label: "Maharashtra Total",
+        data: filteredData,
+        color: "warning"
+      }]
+    };
+  }, [EconomiserStatus]);
 
   // Process RunningEconomisers data for pie chart display (Industry-wise data by region)
   const runningEconomisersPieChartData = useMemo(() => {
@@ -1542,38 +1882,56 @@ function Sheet2() {
     return processPieChartData(variousIndustries, selectedCity);
   }, [variousIndustries, selectedCity]);
 
-  // Process variousIndustries data for Maharashtra total (by region totals)
+  // Process variousIndustries data for Maharashtra total (by industry type indicator)
   const maharashtraIndustriesTotalPieChartData = useMemo(() => {
     if (!variousIndustries || variousIndustries.length === 0) {
       return { labels: [], datasets: {} };
     }
     
-    // Extract region names and their totals from the last column
-    const regionLabels = [];
-    const regionTotals = [];
-    
-    // Process each region row (skip header row and any total row)
-    for (let i = 1; i < variousIndustries.length; i++) {
-      const row = variousIndustries[i];
-      if (row && row[0] && row[0].trim() !== '') {
-        const regionName = row[0];
-        
-        // Skip if this is a total row (check for common total indicators)
-        if (regionName.toLowerCase().includes('total') || 
-            regionName.toLowerCase().includes('sum') ||
-            regionName.toLowerCase().includes('grand')) {
-          continue;
-        }
-        
-        // Get the total from the last column of each row
-        const totalValue = parseInt(row[row.length - 1]) || 0;
-        
-        if (totalValue > 0) {
-          regionLabels.push(regionName);
-          regionTotals.push(totalValue);
-        }
+    // Extract column headers (industry type indicators) from header row (skip first column which is region name)
+    const industryLabels = [];
+    for (let i = 1; i < variousIndustries[0].length; i++) {
+      if (variousIndustries[0][i] && variousIndustries[0][i].trim() !== '') {
+        industryLabels.push(variousIndustries[0][i]);
       }
     }
+    
+    // Calculate totals for each industry type across all regions
+    const industryTotals = [];
+    for (let colIndex = 1; colIndex < variousIndustries[0].length; colIndex++) {
+      let total = 0;
+      
+      // Sum up values for this industry type across all regions (skip header row and total rows)
+      for (let rowIndex = 1; rowIndex < variousIndustries.length; rowIndex++) {
+        const row = variousIndustries[rowIndex];
+        if (row && row[0] && row[0].trim() !== '') {
+          const regionName = row[0];
+          
+          // Skip if this is a total row (check for common total indicators)
+          if (regionName.toLowerCase().includes('total') || 
+              regionName.toLowerCase().includes('sum') ||
+              regionName.toLowerCase().includes('grand')) {
+            continue;
+          }
+          
+          const value = parseInt(row[colIndex]) || 0;
+          total += value;
+        }
+      }
+      
+      industryTotals.push(total);
+    }
+
+    // Filter out industry types with zero totals
+    const filteredLabels = [];
+    const filteredTotals = [];
+    
+    industryLabels.forEach((label, index) => {
+      if (industryTotals[index] > 0 && !label.toLowerCase().includes('total')) {
+        filteredLabels.push(label);
+        filteredTotals.push(industryTotals[index]);
+      }
+    });
 
     // Define colors for pie chart segments
     const backgroundColors = [
@@ -1584,11 +1942,11 @@ function Sheet2() {
     ];
 
     return {
-      labels: regionLabels,
+      labels: filteredLabels,
       datasets: {
-        label: "Maharashtra Total by Region",
-        data: regionTotals,
-        backgroundColors: backgroundColors.slice(0, regionLabels.length)
+        label: "Maharashtra Total by Industry Type",
+        data: filteredTotals,
+        backgroundColors: backgroundColors.slice(0, filteredLabels.length)
       }
     };
   }, [variousIndustries]);
@@ -1686,129 +2044,18 @@ function Sheet2() {
     };
   }, [isMobile, darkMode]);
 
-  // Create table data from API boiler summary data
-  const createApiBoilerSummaryTableData = useMemo(() => {
-    return () => {
-      if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData) || ApiBoilerSummaryData.length === 0) {
-        return { columns: [], rows: [] };
-      }
-
-      // Define columns based on the API response structure
-      const columns = [
-        {
-          Header: "SERVICE TYPE",
-          accessor: "serviceType",
-          minWidth: isMobile ? 150 : isTablet ? 200 : 250,
-          maxWidth: isMobile ? 250 : isTablet ? 300 : 350,
-        },
-        {
-          Header: "TOTAL APPLICATIONS",
-          accessor: "totalApplications",
-          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
-          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
-        },
-        {
-          Header: "TOTAL DISPOSED",
-          accessor: "totalDisposed",
-          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
-          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
-        },
-        {
-          Header: "PENDING",
-          accessor: "pending",
-          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
-          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
-        },
-        {
-          Header: "APPROVED",
-          accessor: "approved",
-          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
-          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
-        },
-        {
-          Header: "REJECTED",
-          accessor: "rejected",
-          minWidth: isMobile ? 80 : isTablet ? 100 : 120,
-          maxWidth: isMobile ? 120 : isTablet ? 150 : 180,
-        },
-        {
-          Header: "DELIVERED ON TIME",
-          accessor: "deliveredOnTime",
-          minWidth: isMobile ? 120 : isTablet ? 150 : 180,
-          maxWidth: isMobile ? 150 : isTablet ? 180 : 200,
-        },
-        {
-          Header: "NOT DELIVERED ON TIME",
-          accessor: "notDeliveredOnTime",
-          minWidth: isMobile ? 140 : isTablet ? 170 : 200,
-          maxWidth: isMobile ? 170 : isTablet ? 200 : 220,
-        },
-      ];
-
-      // Process the API data into table rows
-      let rows = ApiBoilerSummaryData.map((item) => ({
-        serviceType: item.serviceType || 'N/A',
-        totalApplications: item["Total Applications Received 2024-2025"] || item["total Application Received 2024-2025"] || 0,
-        totalDisposed: item.total_Disposed || 0,
-        pending: item.pending || 0,
-        approved: item.approved || 0,
-        rejected: item.rejected || 0,
-        deliveredOnTime: item["is Delivered on time"] || item["is Delivered ontime"] || 0,
-        notDeliveredOnTime: item["is NOT Delivered on time"] || item["is NOT Delivered ontime"] || 0,
-      }));
-
-      // Filter rows based on selected service type or search input
-      if (selectedServiceType !== 'Select All') {
-        rows = rows.filter(row => row.serviceType === selectedServiceType);
-      } else if (debouncedSearchValue && debouncedSearchValue !== 'Select All') {
-        // Real-time filtering based on search input
-        rows = rows.filter(row => 
-          row.serviceType.toLowerCase().includes(debouncedSearchValue.toLowerCase())
-        );
-      }
-
-      return { columns, rows };
-    };
-  }, [ApiBoilerSummaryData, selectedServiceType, debouncedSearchValue, isMobile, darkMode]);
 
   // Create table data from regionalData for the chart
   const regionalTableData = createTableDataFromChart(regionalData, "Regional Data");
   // Create table data for pie charts
   const pieChartTableData = createTableDataFromChart(perTypePieChartData, "Boiler Type Data");
-  const maharashtraTotalTableData = createTableDataFromChart(maharashtraTotalPieChartData, "Maharashtra Total by Region Data");
-  const maharashtraFuelTotalTableData = createTableDataFromChart(maharashtraFuelTotalPieChartData, "Maharashtra Fuel Total by Region Data");
-  const maharashtraCapacityTotalTableData = createTableDataFromChart(maharashtraCapacityTotalBarChartData, "Maharashtra Capacity Total by Region Data");
-  const maharashtraCertificateTotalTableData = createTableDataFromChart(maharashtraCertificateTotalBarChartData, "Maharashtra Certificate Total by Region Data");
-  const maharashtraIndustriesTotalTableData = createTableDataFromChart(maharashtraIndustriesTotalPieChartData, "Maharashtra Industries Total by Region Data");
+  const maharashtraTotalTableData = createTableDataFromChart(maharashtraTotalPieChartData, "Maharashtra Total by Boiler Type Data");
+  const maharashtraFuelTotalTableData = createTableDataFromChart(maharashtraFuelTotalPieChartData, "Maharashtra Fuel Total by Fuel Type Data");
+  const maharashtraCapacityTotalTableData = createTableDataFromChart(maharashtraCapacityTotalBarChartData, "Maharashtra Capacity Total by Capacity Data");
+  const maharashtraCertificateTotalTableData = createTableDataFromChart(maharashtraCertificateTotalBarChartData, "Maharashtra Certificate Total by Certificate Type Data");
+  const maharashtraIndustriesTotalTableData = createTableDataFromChart(maharashtraIndustriesTotalPieChartData, "Maharashtra Industries Total by Industry Type Data");
   const perFuelUsedTableData = createTableDataFromChart(perFuelUsedPieChartData, "Fuel Type Data");
-  const apiBoilerSummaryTableData = createApiBoilerSummaryTableData();
   
-  // Generate dropdown options for service type filter
-  const serviceTypeOptions = useMemo(() => {
-    if (!ApiBoilerSummaryData || !Array.isArray(ApiBoilerSummaryData) || ApiBoilerSummaryData.length === 0) {
-      return [{ label: 'Select All', value: 'Select All' }];
-    }
-    
-    const options = [{ label: 'Select All', value: 'Select All' }];
-    ApiBoilerSummaryData.forEach((item) => {
-      if (item.serviceType && !options.some(opt => opt.value === item.serviceType)) {
-        options.push({ label: item.serviceType, value: item.serviceType });
-      }
-    });
-    
-    return options;
-  }, [ApiBoilerSummaryData]);
-
-  // Filtered options based on search input
-  const filteredServiceTypeOptions = useMemo(() => {
-    if (!serviceTypeSearchValue || serviceTypeSearchValue === 'Select All') {
-      return serviceTypeOptions;
-    }
-    
-    return serviceTypeOptions.filter(option => 
-      option.label.toLowerCase().includes(serviceTypeSearchValue.toLowerCase())
-    );
-  }, [serviceTypeOptions, serviceTypeSearchValue]);
   
   const variousIndustriesTableData = createTableDataFromChart(variousIndustriesPieChartData, "Various Industries Data");
   const HeatingSurfaceTableData = createTableDataFromChart(HeatingSurfacePieChartData, "Heating Surface Data");
@@ -1923,31 +2170,13 @@ function Sheet2() {
       {/* ... existing code ... */}
       <Grid container spacing={3} pt={3}>
         <>
-          {/* Data Source Indicator */}
-          {/* <Grid item xs={12}>
-            <MDBox mb={2} textAlign="center">
-              <MDTypography variant="body2" color="text" fontWeight="light">
-                {selectedCity ? 
-                  selectedCity === 'MAHARASHTRA' ? 
-                    'Showing Maharashtra-wide statistics and trends' :
-                  (totalstate && totalstate.find(row => 
-                    row && row[0] && row[0].toString().toLowerCase() === selectedCity.toLowerCase()
-                  )) ? 
-                    `Showing data for ${selectedCity} region` : 
-                    `No data available for ${selectedCity} region - showing totals instead`
-                  : 
-                  "Showing total data across all regions"
-                }
-              </MDTypography>
-            </MDBox>
-          </Grid> */}
-          
           <Grid item xs={12} md={6} lg={4}>
             <MDBox mb={1.5}>
               <ComplexStatisticsCard
                 icon="leaderboard"
                 title={selectedCity === 'MAHARASHTRA' ? "Maharashtra Running Boilers" : selectedCity ? `${selectedCity} Running Boilers` : "Total Running Boilers"}
                 count={totalValues.running.toString()}
+                color="success"
                 percentage={{
                   color: "success",
                   label: "Running Boilers",
@@ -1961,12 +2190,12 @@ function Sheet2() {
                 icon="store"
                 title={selectedCity === 'MAHARASHTRA' ? "Maharashtra - Not Offered Since Last 1 Year" : selectedCity ? `${selectedCity} - Not Offered Since Last 1 Year` : "Not Offered Since Last 1 Year"}
                 count={totalValues.notOffered.toString()}
-                  color="success"
-                  percentage={{
-                    color: "success",
-                    label: "Not Offered Since Last 1 Year",
-                  }}
-                />
+                color="error"
+                percentage={{
+                  color: "error",
+                  label: "Not Offered Since Last 1 Year",
+                }}
+              />
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
@@ -1975,9 +2204,9 @@ function Sheet2() {
                   icon="table"
                   title={selectedCity === 'MAHARASHTRA' ? "Maharashtra Idle Boilers" : selectedCity ? `${selectedCity} Idle Boilers` : "Total Idle Boilers"}
                   count={totalValues.idle.toString()}
-                  color="error"
+                  color="warning"
                   percentage={{
-                    color: "success",
+                    color: "warning",
                     label: "Idle Boilers",
                   }}
                 />
@@ -2230,15 +2459,119 @@ function Sheet2() {
                                 </Grid>
                               </MDBox>
                               
-                              {/* Chart 4: Accident Statistics Over Years */}
+                              {/* Accident Statistics Over Years Section */}
                               <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
-                                <DefaultLineChart
-                                  icon={{ color: "error", component: "warning" }}
-                                  title="Accident Statistics Over Years"
-                                  description="Accident trends including total accidents, deaths, and injuries"
-                                  height="19.125rem"
-                                  chart={accidentsLineChartData}
-                                />
+                                {/* Single Header for the entire Accident Statistics section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="error"
+                                  borderRadius="lg"
+                                  coloredShadow="error"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Accident Statistics Over Years
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Accident Statistics */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={accidentChartType}
+                                          onChange={(e) => setAccidentChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Bar Chart', 'Pie Chart', 'Line Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {accidentChartType === 'Bar Chart' ? (
+                                        <ReportsBarChart
+                                          color="error"
+                                          title=""
+                                          description="Accident trends including total accidents, deaths, and injuries"
+                                          date=""
+                                          chart={accidentsBarChartData}
+                                        />
+                                      ) : accidentChartType === 'Pie Chart' ? (
+                                        <PieChart
+                                          color="error"
+                                          title=""
+                                          description="Accident trends including total accidents, deaths, and injuries"
+                                          date=""
+                                          chart={accidentsPieChartData}
+                                        />
+                                      ) : (
+                                        <DefaultLineChart
+                                          icon={{ color: "error", component: "warning" }}
+                                          title=""
+                                          description="Accident trends including total accidents, deaths, and injuries"
+                                          height="19.125rem"
+                                          chart={accidentsLineChartData}
+                                        />
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Accident Statistics Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`accident-statistics-table`}
+                                              table={accidentsTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>
+                                  </Grid>
+                                </Grid>
                               </MDBox>
                               
                               {/* Maharashtra Total Boiler Type Section */}
@@ -2274,7 +2607,7 @@ function Sheet2() {
                                       
                                       {boilerTypeChartType === 'Pie Chart' ? (
                                         <PieChart
-                                          color="info"
+                                          color="error"
                                           title=""
                                           description=""
                                           date=""
@@ -2282,7 +2615,7 @@ function Sheet2() {
                                         />
                                       ) : (
                                         <ReportsBarChart
-                                          color="info"
+                                          color="error"
                                           title=""
                                           description=""
                                           date=""
@@ -2602,7 +2935,7 @@ function Sheet2() {
                                           </MDBox>
                                         ) : maharashtraCertificateTotalBarChartData && maharashtraCertificateTotalBarChartData.datasets && Array.isArray(maharashtraCertificateTotalBarChartData.datasets) && maharashtraCertificateTotalBarChartData.datasets.length > 0 ? (
                                           <ReportsBarChart
-                                            color="warning"
+                                            color="error"
                                             title=""
                                             description=""
                                             date=""
@@ -2624,7 +2957,7 @@ function Sheet2() {
                                           </MDBox>
                                         ) : maharashtraCertificateTotalBarChartData && maharashtraCertificateTotalBarChartData.datasets && Array.isArray(maharashtraCertificateTotalBarChartData.datasets) && maharashtraCertificateTotalBarChartData.datasets.length > 0 ? (
                                           <PieChart
-                                            color="warning"
+                                            color="error"
                                             title=""
                                             description=""
                                             date=""
@@ -2776,6 +3109,113 @@ function Sheet2() {
                                             <DataTable
                                               key={`maharashtra-industries-table`}
                                               table={maharashtraIndustriesTotalTableData}
+                                              entriesPerPage={false}
+                                              canSearch={false}
+                                              showTotalEntries={false}
+                                              isLoading={loading}
+                                              isSorted={false}
+                                              defaultPageSize={1000}
+                                              sx={{
+                                                minWidth: isMobile ? '100%' : 'auto',
+                                                fontSize: isMobile ? '12px' : '14px',
+                                                '& .MuiTableCell-root': {
+                                                  padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                                  borderSpacing: isMobile ? '2px' : '4px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableHead-root .MuiTableCell-root': {
+                                                  padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: 600,
+                                                },
+                                                '& .MuiTableBody-root .MuiTableCell-root': {
+                                                  fontSize: isMobile ? '12px' : '14px',
+                                                  color: darkMode ? '#ffffff' : '#000000',
+                                                  fontWeight: '500',
+                                                },
+                                                '& .MuiTableContainer-root': {
+                                                  height: '100%',
+                                                  borderRadius: '8px',
+                                                  overflow: 'hidden',
+                                                },
+                                              }}
+                                            />
+                                          </div>
+                                        </MDBox>
+                                      </Card>
+                                    </MDBox>         
+                                  </Grid>
+                                </Grid>
+                              </MDBox>
+                              
+                              {/* Maharashtra Economiser Statistics Section */}
+                              <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
+                                {/* Single Header for the entire Maharashtra Economiser Statistics section */}
+                                <MDBox
+                                  mx={isMobile ? 1 : 2}
+                                  mb={2}
+                                  py={isMobile ? 2 : 3}
+                                  px={isMobile ? 1 : 2}
+                                  variant="gradient"
+                                  bgColor="warning"
+                                  borderRadius="lg"
+                                  coloredShadow="warning"
+                                >
+                                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                                    Maharashtra Economiser Statistics
+                                  </MDTypography>
+                                </MDBox>
+                                
+                                <Grid container spacing={isMobile ? 1 : 3}>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    <MDBox mb={isMobile ? 1 : 3}>
+                                      {/* Chart Type Selector for Maharashtra Economiser Statistics */}
+                                      <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                        <MDSelect
+                                          value={maharashtraEconomiserChartType}
+                                          onChange={(e) => setMaharashtraEconomiserChartType(e.target.value)}
+                                          label="Chart Type"
+                                          options={['Bar Chart', 'Pie Chart']}
+                                        />
+                                      </MDBox>
+                                      
+                                      {maharashtraEconomiserChartType === 'Bar Chart' ? (
+                                        <ReportsBarChart
+                                          color="warning"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={maharashtraEconomiserStatusBarChartData}
+                                        />
+                                      ) : (
+                                        <PieChart
+                                          color="warning"
+                                          title=""
+                                          description=""
+                                          date=""
+                                          chart={convertBarToPieChartData(maharashtraEconomiserStatusBarChartData)}
+                                        />
+                                      )}
+                                    </MDBox>
+                                  </Grid>
+                                  <Grid item xs={12} md={6} lg={6}>
+                                    {/* Maharashtra Economiser Statistics Data Table */}
+                                    <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                                      <Card>
+                                        <MDBox pt={isMobile ? 2 : 3}>
+                                          <div style={{
+                                            overflowX: 'auto',
+                                            overflowY: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                            borderRadius: '8px',
+                                          }}>
+                                            <DataTable
+                                              key={`maharashtra-economiser-table`}
+                                              table={createTableDataFromChart(maharashtraEconomiserStatusBarChartData, "Maharashtra Economiser Data")}
                                               entriesPerPage={false}
                                               canSearch={false}
                                               showTotalEntries={false}
@@ -3569,7 +4009,7 @@ function Sheet2() {
                       coloredShadow="warning"
                     >
                       <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
-                        {selectedCity || 'Region'} Boiler as per various district
+                        {selectedCity || 'Region'} Economiser Statistics
                       </MDTypography>
                     </MDBox>
                     
@@ -3891,7 +4331,6 @@ function Sheet2() {
                                   maxWidth: '100%',
                                   maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
                                   borderRadius: '8px',
-                                  overflow: 'hidden',
                                 }}>
                                   <DataTable
                                     key={`industries-table-${selectedCity}`}
@@ -4165,13 +4604,117 @@ function Sheet2() {
                     {/* User-Only Charts Section - City-Specific Accident Statistics */}
                     {!isAdmin && selectedCity && cityAccidentLineChartData.labels.length > 0 && (
                       <MDBox mb={isMobile ? 2 : 3} mt={isMobile ? 2 : 3}>
-                        <DefaultLineChart
-                          icon={{ color: "info", component: "location_city" }}
-                          title={`${selectedCity} - City Accident Statistics`}
-                          description={`Accident trends for ${selectedCity} including total accidents, deaths, and injuries by year`}
-                          height="19.125rem"
-                          chart={cityAccidentLineChartData}
-                        />
+                        {/* Single Header for the entire City Accident Statistics section */}
+                        <MDBox
+                          mx={isMobile ? 1 : 2}
+                          mb={2}
+                          py={isMobile ? 2 : 3}
+                          px={isMobile ? 1 : 2}
+                          variant="gradient"
+                          bgColor="info"
+                          borderRadius="lg"
+                          coloredShadow="info"
+                        >
+                          <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px'}}>
+                            {selectedCity} - City Accident Statistics
+                          </MDTypography>
+                        </MDBox>
+                        
+                        <Grid container spacing={isMobile ? 1 : 3}>
+                          <Grid item xs={12} md={6} lg={6}>
+                            <MDBox mb={isMobile ? 1 : 3}>
+                              {/* Chart Type Selector for City Accident Statistics */}
+                              <MDBox mb={2} display="flex" justifyContent="flex-end">
+                                <MDSelect
+                                  value={cityAccidentChartType}
+                                  onChange={(e) => setCityAccidentChartType(e.target.value)}
+                                  label="Chart Type"
+                                  options={['Bar Chart', 'Pie Chart', 'Line Chart']}
+                                />
+                              </MDBox>
+                              
+                              {cityAccidentChartType === 'Bar Chart' ? (
+                                <ReportsBarChart
+                                  color="info"
+                                  title=""
+                                  description={`Accident trends for ${selectedCity} including total accidents, deaths, and injuries by year`}
+                                  date=""
+                                  chart={cityAccidentBarChartData}
+                                />
+                              ) : cityAccidentChartType === 'Pie Chart' ? (
+                                <PieChart
+                                  color="info"
+                                  title=""
+                                  description={`Accident trends for ${selectedCity} including total accidents, deaths, and injuries by year`}
+                                  date=""
+                                  chart={cityAccidentPieChartData}
+                                />
+                              ) : (
+                                <DefaultLineChart
+                                  icon={{ color: "info", component: "location_city" }}
+                                  title=""
+                                  description={`Accident trends for ${selectedCity} including total accidents, deaths, and injuries by year`}
+                                  height="19.125rem"
+                                  chart={cityAccidentLineChartData}
+                                />
+                              )}
+                            </MDBox>
+                          </Grid>
+                          <Grid item xs={12} md={6} lg={6}>
+                            {/* City Accident Statistics Data Table */}
+                            <MDBox mb={isMobile ? 2 : 3} pt={isMobile ? 3 : 6}>
+                              <Card>
+                                <MDBox pt={isMobile ? 2 : 3}>
+                                  <div style={{
+                                    overflowX: 'auto',
+                                    overflowY: 'auto',
+                                    maxWidth: '100%',
+                                    maxHeight: isMobile ? '300px' : isTablet ? '350px' : '400px',
+                                    borderRadius: '8px',
+                                  }}>
+                                    <DataTable
+                                      key={`city-accident-statistics-table`}
+                                      table={cityAccidentTableData}
+                                      entriesPerPage={false}
+                                      canSearch={false}
+                                      showTotalEntries={false}
+                                      isLoading={loading}
+                                      isSorted={false}
+                                      defaultPageSize={1000}
+                                      sx={{
+                                        minWidth: isMobile ? '100%' : 'auto',
+                                        fontSize: isMobile ? '12px' : '14px',
+                                        '& .MuiTableCell-root': {
+                                          padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
+                                          borderSpacing: isMobile ? '2px' : '4px',
+                                          fontSize: isMobile ? '12px' : '14px',
+                                          color: darkMode ? '#ffffff' : '#000000',
+                                          fontWeight: '500',
+                                        },
+                                        '& .MuiTableHead-root .MuiTableCell-root': {
+                                          padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
+                                          fontSize: isMobile ? '12px' : '14px',
+                                          color: darkMode ? '#ffffff' : '#000000',
+                                          fontWeight: 600,
+                                        },
+                                        '& .MuiTableBody-root .MuiTableCell-root': {
+                                          fontSize: isMobile ? '12px' : '14px',
+                                          color: darkMode ? '#ffffff' : '#000000',
+                                          fontWeight: '500',
+                                        },
+                                        '& .MuiTableContainer-root': {
+                                          height: '100%',
+                                          borderRadius: '8px',
+                                          overflow: 'hidden',
+                                        },
+                                      }}
+                                    />
+                                  </div>
+                                </MDBox>
+                              </Card>
+                            </MDBox>
+                          </Grid>
+                        </Grid>
                       </MDBox>
                     )}
 
@@ -4184,158 +4727,6 @@ function Sheet2() {
         </Grid>
       </MDBox>
 
-      {/* API Boiler Summary Data Section */}
-      <MDBox pt={isMobile ? 3 : 6} pb={isMobile ? 2 : 3}>
-        <Grid container spacing={isMobile ? 2 : 6}>
-          <Grid item xs={12}>
-            <Card>
-              <MDBox
-                mx={isMobile ? 1 : 2}
-                mt={isMobile ? -2 : -3}
-                py={isMobile ? 2 : 3}
-                px={isMobile ? 1 : 2}
-                variant="gradient"
-                bgColor="primary"
-                borderRadius="lg"
-                coloredShadow="primary"
-              >
-                <MDBox display="flex" justifyContent="space-between" alignItems="center">
-                  <MDTypography variant="h6" color="white" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                    Boiler Summary Data (2024-2025)
-                  </MDTypography>
-                  <MDBox display="flex" alignItems="center" gap={2}>
-                    <MDTypography variant="body2" color="white" style={{ fontSize: isMobile ? '12px' : '14px' }}>
-                      Filter by Service Type:
-                    </MDTypography>
-                    <Autocomplete
-                      value={serviceTypeOptions.find(option => option.value === selectedServiceType) || serviceTypeOptions[0]}
-                      onChange={(event, newValue) => {
-                        if (newValue) {
-                          setSelectedServiceType(newValue.value);
-                          setServiceTypeSearchValue(newValue.value);
-                        } else {
-                          // Handle clear action
-                          setSelectedServiceType('Select All');
-                          setServiceTypeSearchValue('Select All');
-                        }
-                      }}
-                      onInputChange={(event, newInputValue) => {
-                        setServiceTypeSearchValue(newInputValue);
-                        // Reset selectedServiceType when user starts typing
-                        if (newInputValue && newInputValue !== selectedServiceType) {
-                          setSelectedServiceType('Select All');
-                        }
-                      }}
-                      options={filteredServiceTypeOptions}
-                      getOptionLabel={(option) => option.label}
-                      isOptionEqualToValue={(option, value) => option.value === value.value}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          variant="outlined"
-                          placeholder="Search service type..."
-                          sx={{
-                            minWidth: isMobile ? '150px' : '200px',
-                            '& .MuiOutlinedInput-root': {
-                              color: 'white',
-                              fontSize: isMobile ? '12px' : '14px',
-                              '& fieldset': {
-                                borderColor: 'rgba(255, 255, 255, 0.5)',
-                              },
-                              '&:hover fieldset': {
-                                borderColor: 'white',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: 'white',
-                              },
-                            },
-                            '& .MuiInputBase-input': {
-                              color: 'white',
-                              fontSize: isMobile ? '12px' : '14px',
-                            },
-                            '& .MuiInputBase-input::placeholder': {
-                              color: 'rgba(255, 255, 255, 0.7)',
-                              opacity: 1,
-                            },
-                            '& .MuiSvgIcon-root': {
-                              color: 'white',
-                            },
-                          }}
-                        />
-                      )}
-                      renderOption={(props, option) => (
-                        <li {...props} style={{ 
-                          fontSize: isMobile ? '12px' : '14px',
-                          padding: isMobile ? '8px 12px' : '12px 16px'
-                        }}>
-                          {option.label}
-                        </li>
-                      )}
-                      ListboxProps={{
-                        style: {
-                          maxHeight: '200px',
-                          fontSize: isMobile ? '12px' : '14px',
-                        }
-                      }}
-                      noOptionsText="No service types found"
-                      clearOnEscape
-                      selectOnFocus
-                      handleHomeEndKeys
-                    />
-                  </MDBox>
-                </MDBox>
-              </MDBox>
-              <MDBox pt={isMobile ? 2 : 3}>
-                <div style={{
-                  overflowX: 'auto',
-                  overflowY: 'auto',
-                  maxWidth: '100%',
-                  maxHeight: isMobile ? '400px' : isTablet ? '500px' : '600px',
-                  borderRadius: '8px',
-                }}>
-                  <DataTable
-                    key={`api-boiler-summary-table`}
-                    table={apiBoilerSummaryTableData}
-                    entriesPerPage={false}
-                    canSearch={false}
-                    showTotalEntries={false}
-                    isLoading={loading}
-                    isSorted={false}
-                    defaultPageSize={1000}
-                    sx={{
-                      minWidth: isMobile ? '100%' : 'auto',
-                      fontSize: isMobile ? '12px' : '14px',
-                      '& .MuiTableCell-root': {
-                        padding: isMobile ? '8px 4px' : isTablet ? '10px 6px' : '12px 8px',
-                        borderSpacing: isMobile ? '2px' : '4px',
-                        fontSize: isMobile ? '12px' : '14px',
-                        color: darkMode ? '#ffffff' : '#000000',
-                        fontWeight: '500',
-                      },
-                      '& .MuiTableHead-root .MuiTableCell-root': {
-                        padding: isMobile ? '10px 4px' : isTablet ? '12px 6px' : '14px 8px',
-                        fontSize: isMobile ? '12px' : '14px',
-                        color: darkMode ? '#ffffff' : '#000000',
-                        fontWeight: 600,
-                      },
-                      '& .MuiTableBody-root .MuiTableCell-root': {
-                        fontSize: isMobile ? '12px' : '14px',
-                        color: darkMode ? '#ffffff' : '#000000',
-                        fontWeight: '500',
-                      },
-                      '& .MuiTableContainer-root': {
-                        height: '100%',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                      },
-                    }}
-                  />
-                </div>
-              </MDBox>
-            </Card>
-          </Grid>
-        </Grid>
-      </MDBox>
 
       <Footer />
     </DashboardLayout>
@@ -4343,3 +4734,8 @@ function Sheet2() {
 }
 
 export default Sheet2;
+
+
+
+
+

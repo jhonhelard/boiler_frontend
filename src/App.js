@@ -21,6 +21,9 @@ import ProtectedRoute from "examples/ProtectedRoute";
 import { setupAxiosInterceptors } from "./services/interceptor";
 import { testJWTDecoding } from "./utils/testJWT";
 
+// Ant Design CSS
+import 'antd/dist/reset.css';
+
 // Make test function available globally for debugging
 window.testJWT = testJWTDecoding;
 

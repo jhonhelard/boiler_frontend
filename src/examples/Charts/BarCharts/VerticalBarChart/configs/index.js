@@ -80,16 +80,24 @@ function configs(labels, datasets) {
           ticks: {
             display: true,
             autoSkip: false,
-            maxRotation: 0,
+            maxRotation: 45,
             minRotation: 0,
             color: "#9ca2b7",
             padding: 10,
             font: {
-              size: 11,
+              size: 10,
               family: typography.fontFamily,
               style: "normal",
-              lineHeight: 2,
+              lineHeight: 1.2,
             },
+            callback: function(value, index, ticks) {
+              const label = this.getLabelForValue(value);
+              // If label is longer than 15 characters, use smaller font and truncate
+              if (label && label.length > 15) {
+                return label.length > 25 ? label.substring(0, 22) + '...' : label;
+              }
+              return label;
+            }
           },
         },
       },
