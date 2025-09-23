@@ -40,7 +40,17 @@ function configs(labels, datasets) {
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || '';
-              const value = context.parsed.y || context.parsed || 0;
+              // Safely resolve numeric value; handle 0 without falling back to an object
+              let value;
+              if (context && context.parsed && typeof context.parsed.y !== 'undefined') {
+                value = context.parsed.y;
+              } else if (typeof context.raw === 'number') {
+                value = context.raw;
+              } else if (typeof context.parsed === 'number') {
+                value = context.parsed;
+              } else {
+                value = 0;
+              }
               return `${label}: ${value}`;
             }
           }
